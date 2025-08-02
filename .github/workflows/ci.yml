@@ -12,18 +12,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-    
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~\go\pkg\mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+    - name: Verify Go installation
+      run: go version
     
     - name: Download dependencies
       run: go mod download
@@ -71,10 +61,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+    - name: Verify Go installation
+      run: go version
     
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3
@@ -87,10 +75,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+    - name: Verify Go installation
+      run: go version
     
     - name: Run Gosec Security Scanner
       run: |
