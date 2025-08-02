@@ -109,10 +109,10 @@ jobs:
     
     - name: Quick validation tests for release
       run: |
-        echo "リリース前の軽量テストを実行中..."
-        echo "testジョブで既にテスト済みのため、ビルド確認のみ実行..."
+        Write-Host "リリース前の軽量テストを実行中..."
+        Write-Host "testジョブで既にテスト済みのため、ビルド確認のみ実行..."
         go build -ldflags "-s -w" -trimpath -v ./...
-        echo "リリース品質検証完了。リリース続行..."
+        Write-Host "リリース品質検証完了。リリース続行..."
       env:
         GOOS: windows
         GOARCH: amd64
@@ -142,18 +142,18 @@ jobs:
     - name: Build release executable (Anti-Virus Optimized)
       shell: powershell
       run: |
-        echo "ウイルス対策ソフト誤検知を減らす最適化ビルドを実行中..."
+        Write-Host "ウイルス対策ソフト誤検知を減らす最適化ビルドを実行中..."
         $env:GOOS = "windows"
         $env:GOARCH = "amd64"
         $env:CGO_ENABLED = "0"
         go build -ldflags "-s -w -X main.Version=${{ steps.set_version.outputs.version }}" -trimpath -buildmode=exe -o print_pdf.exe .
-        echo "最適化ビルド完了"
+        Write-Host "最適化ビルド完了"
         
         # ファイルサイズとハッシュを表示
         $fileInfo = Get-Item print_pdf.exe
-        echo "ファイルサイズ: $($fileInfo.Length) bytes"
+        Write-Host "ファイルサイズ: $($fileInfo.Length) bytes"
         $hash = Get-FileHash print_pdf.exe -Algorithm SHA256
-        echo "SHA256: $($hash.Hash)"
+        Write-Host "SHA256: $($hash.Hash)"
     
     - name: Create zip archive
       shell: powershell
@@ -162,11 +162,11 @@ jobs:
         
         # ZIPファイルの情報も表示
         $zipInfo = Get-Item print_pdf_${{ steps.set_version.outputs.version }}.zip
-        echo "ZIPファイルサイズ: $($zipInfo.Length) bytes"
+        Write-Host "ZIPファイルサイズ: $($zipInfo.Length) bytes"
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
+      if: github.event.inputs.create_release == 'true' || github.ref == 'refs/heads/main'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
