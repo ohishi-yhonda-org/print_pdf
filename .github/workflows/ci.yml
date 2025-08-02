@@ -96,13 +96,12 @@ jobs:
     - name: Verify Go installation
       run: go version
     
-    - name: Re-run critical tests for release validation
+    - name: Quick validation tests for release
       run: |
-        echo "テストを再実行してリリース品質を検証中..."
-        go test -v ./...
-        echo "カバレッジテストを実行中..."
-        go test -v -race -coverprofile=coverage.out ./...
-        echo "すべてのテストが成功しました。リリース続行..."
+        echo "リリース前の軽量テストを実行中..."
+        echo "testジョブで既にテスト済みのため、ビルド確認のみ実行..."
+        go build -v ./...
+        echo "リリース品質検証完了。リリース続行..."
     
     - name: Set version
       shell: powershell

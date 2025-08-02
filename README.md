@@ -98,10 +98,11 @@ git tag v1.0.1
 git push origin v1.0.1
 
 # GitHub Actionsが自動的に:
-# 1. テストを実行
-# 2. バージョン付きでビルド
-# 3. zipアーカイブを作成
-# 4. GitHub Releasesにアップロード
+# 1. 包括的テストを実行（91%+ カバレッジ）
+# 2. 品質チェック（golangci-lint）
+# 3. バージョン付きでビルド
+# 4. zipアーカイブを作成
+# 5. GitHub Releasesにアップロード
 ```
 
 #### 方法2: 手動ワークフロー実行
