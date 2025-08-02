@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
@@ -121,7 +120,7 @@ func (c *ReportLabStylePdfClient) setupWindowsFont() error {
 func truncateText(text string, maxLength int) string {
 	if len([]rune(text)) > maxLength {
 		textRunes := []rune(text)
-		return string(textRunes[:maxLength]) + "..."
+		return string(textRunes[:maxLength])
 	}
 	return text
 }
@@ -361,72 +360,103 @@ func (c *ReportLabStylePdfClient) printRyohiItems(ryohiList []Ryohi) {
 
 	c.pdf.SetFont("yumin", "", 10)
 
+	currentRow := 0
 	for i, ryohi := range ryohiList {
-		if i >= 7 { // 最大7行まで表示
+		if currentRow >= 14 { // 最大14行まで表示
 			break
 		}
 
-		currentY := startY + float64(i)*rowHeight
-		currentX := startX
+		// 旅費データを印刷用に準備（摘要10文字、区間22文字制限）
+		printData := prepareRyohiForPrint(ryohi, 10, 22)
 
-		// 日付
-		if ryohi.Date != nil {
-			date := *ryohi.Date
-			if t, err := time.Parse("2006-01-02", date); err == nil {
-				date = t.Format("01/02")
+		// 残り行数をチェック（14行まで対応）
+		remainingRows := 14 - currentRow
+		actualRows := printData.MaxRows
+		if actualRows > remainingRows {
+			actualRows = remainingRows
+		}
+
+		// 実際に描画する行をカウント
+		drawnRows := 0
+
+		// 各行を印刷（コンテンツがある行のみ）
+		for row := 0; row < actualRows && drawnRows < remainingRows; row++ {
+			// この行にコンテンツがあるかチェック
+			if !printData.hasContentInRow(row) {
+				continue // 空行はスキップ
 			}
-			textWidth := c.pdf.GetStringWidth(date)
-			c.pdf.Text(currentX+(colWidths[0]-textWidth)/2, currentY+6, date)
+
+			// 表の物理行を計算（14行を7行に配置）
+			logicalRow := currentRow + drawnRows // 現在の論理行位置
+			physicalRow := logicalRow / 2        // 実際のPDF上の表の行
+			subRow := logicalRow % 2             // その行の上半分(0)か下半分(1)か
+			yOffset := float64(subRow) * 5.0     // 上半分は+0mm、下半分は+5mm
+
+			currentY := startY + float64(physicalRow)*rowHeight + yOffset
+			currentX := startX
+
+			// 日付
+			if row < len(printData.DateLines) && printData.DateLines[row] != "" {
+				date := printData.DateLines[row]
+				c.pdf.SetFont("yumin", "", 10)
+				textWidth := c.pdf.GetStringWidth(date)
+				c.pdf.Text(currentX+(colWidths[0]-textWidth)/2, currentY+6, date)
+			}
+			currentX += colWidths[0]
+
+			// 行先
+			if row < len(printData.DestLines) && printData.DestLines[row] != "" {
+				dest := printData.DestLines[row]
+				textWidth := c.pdf.GetStringWidth(dest)
+				c.pdf.Text(currentX+(colWidths[1]-textWidth)/2, currentY+6, dest)
+			}
+			currentX += colWidths[1]
+
+			// 摘要
+			if row < len(printData.DetailLines) && printData.DetailLines[row] != "" {
+				detail := printData.DetailLines[row]
+				c.pdf.Text(currentX+1, currentY+6, detail)
+			}
+			currentX += colWidths[2]
+
+			// 区間
+			if row < len(printData.KukanLines) && printData.KukanLines[row] != "" {
+				kukan := printData.KukanLines[row]
+				c.pdf.Text(currentX+1, currentY+6, kukan)
+			}
+			currentX += colWidths[3]
+
+			// 交通機関（空）
+			currentX += colWidths[4]
+
+			// 運賃（空）
+			currentX += colWidths[5]
+
+			// 特別料金（空）
+			currentX += colWidths[6]
+
+			// 旅費日当
+			if row < len(printData.PriceLines) && printData.PriceLines[row] != "" {
+				priceStr := printData.PriceLines[row]
+				textWidth := c.pdf.GetStringWidth(priceStr)
+				c.pdf.Text(currentX+colWidths[7]-textWidth-1, currentY+6, priceStr)
+			}
+			currentX += colWidths[7]
+
+			// 計
+			if row < len(printData.VolLines) && printData.VolLines[row] != "" {
+				volStr := printData.VolLines[row]
+				textWidth := c.pdf.GetStringWidth(volStr)
+				c.pdf.Text(currentX+colWidths[8]-textWidth-1, currentY+6, volStr)
+			}
+
+			drawnRows++ // 実際に描画した行数をインクリメント
 		}
-		currentX += colWidths[0]
 
-		// 行先
-		if ryohi.Dest != nil {
-			dest := truncateText(*ryohi.Dest, 8)
-			textWidth := c.pdf.GetStringWidth(dest)
-			c.pdf.Text(currentX+(colWidths[1]-textWidth)/2, currentY+6, dest)
-		}
-		currentX += colWidths[1]
+		currentRow += drawnRows // 実際に描画した行数分だけ進める
 
-		// 摘要
-		if len(ryohi.Detail) > 0 {
-			detail := strings.Join(ryohi.Detail, "、")
-			detail = truncateText(detail, 18)
-			c.pdf.Text(currentX+1, currentY+6, detail)
-		}
-		currentX += colWidths[2]
-
-		// 区間
-		if ryohi.Kukan != nil {
-			kukan := truncateText(*ryohi.Kukan, 22)
-			c.pdf.Text(currentX+1, currentY+6, kukan)
-		}
-		currentX += colWidths[3]
-
-		// 交通機関（空）
-		currentX += colWidths[4]
-
-		currentX += colWidths[5]
-
-		// 特別料金（空）
-		currentX += colWidths[6]
-
-		// 運賃
-		if ryohi.Price != nil {
-			priceStr := FormatPrice(*ryohi.Price)
-			textWidth := c.pdf.GetStringWidth(priceStr)
-			c.pdf.Text(currentX+colWidths[7]-textWidth-1, currentY+6, priceStr)
-		}
-		// 旅費日当
-		currentX += colWidths[7]
-
-		if ryohi.Vol != nil {
-			volStr := fmt.Sprintf("%.1f", *ryohi.Vol)
-			textWidth := c.pdf.GetStringWidth(volStr)
-			c.pdf.Text(currentX+colWidths[8]-textWidth-1, currentY+6, volStr)
-		}
-		// 計（空）
-		// currentX += colWidths[8]
-
+		// デバッグ情報
+		fmt.Printf("旅費項目 %d: 最大行数=%d, 実際印刷行数=%d, 現在行=%d\n",
+			i+1, printData.MaxRows, drawnRows, currentRow)
 	}
 }
