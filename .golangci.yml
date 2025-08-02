@@ -1,5 +1,6 @@
-version: "1"
-
+# yaml-language-server: $schema=http://json.schemastore.org/base
+# yaml-language-server: disable
+# golangci-lint v1 configuration - schema validation disabled
 run:
   timeout: 5m
 
