@@ -121,17 +121,17 @@ func truncateText(text string, maxLength int) string {
 	if maxLength <= 0 {
 		return "..."
 	}
-	
+
 	textRunes := []rune(text)
 	if len(textRunes) <= maxLength {
 		return text
 	}
-	
+
 	// 省略記号分を考慮
 	if maxLength <= 3 {
 		return "..."
 	}
-	
+
 	// maxLengthより長い場合は切り詰めて...を追加
 	return string(textRunes[:maxLength-3]) + "..."
 }

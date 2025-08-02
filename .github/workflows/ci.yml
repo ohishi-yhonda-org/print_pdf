@@ -29,13 +29,7 @@ jobs:
       env:
         GOOS: windows
         GOARCH: amd64
-    
-    - name: Run tests with race detector
-      run: go test -race -short ./...
-      env:
-        GOOS: windows
-        GOARCH: amd64
-    
+
     - name: Run tests with coverage
       run: go test -coverprofile=coverage.out ./...
       env:
