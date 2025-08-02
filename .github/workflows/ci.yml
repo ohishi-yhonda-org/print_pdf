@@ -109,10 +109,10 @@ jobs:
     
     - name: Quick validation tests for release
       run: |
-        Write-Host "リリース前の軽量テストを実行中..."
-        Write-Host "testジョブで既にテスト済みのため、ビルド確認のみ実行..."
+        Write-Host 'リリース前の軽量テストを実行中...'
+        Write-Host 'testジョブで既にテスト済みのため、ビルド確認のみ実行...'
         go build -ldflags "-s -w" -trimpath -v ./...
-        Write-Host "リリース品質検証完了。リリース続行..."
+        Write-Host 'リリース品質検証完了。リリース続行...'
       env:
         GOOS: windows
         GOARCH: amd64
@@ -124,16 +124,16 @@ jobs:
       run: |
         if ("${{ github.event.inputs.version }}" -ne "" -and "${{ github.event.inputs.create_release }}" -eq "true") {
           $version = "${{ github.event.inputs.version }}"
-          echo "手動指定バージョン: $version"
+          echo '手動指定バージョン: ' + $version
         } elseif ("${{ github.ref_name }}" -match "^v\d+\.\d+\.\d+") {
           $version = "${{ github.ref_name }}"
-          echo "タグバージョン: $version"
+          echo 'タグバージョン: ' + $version
         } else {
           # mainブランチの場合、日付ベースのバージョン
           $date = Get-Date -Format "yyyyMMdd"
           $time = Get-Date -Format "HHmm"
           $version = "v1.0.0-dev.$date.$time"
-          echo "開発バージョン: $version"
+          echo '開発バージョン: ' + $version
         }
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "VERSION=$version" >> $env:GITHUB_ENV
@@ -142,12 +142,12 @@ jobs:
     - name: Build release executable (Anti-Virus Optimized)
       shell: powershell
       run: |
-        Write-Host "ウイルス対策ソフト誤検知を減らす最適化ビルドを実行中..."
+        Write-Host 'ウイルス対策ソフト誤検知を減らす最適化ビルドを実行中...'
         $env:GOOS = "windows"
         $env:GOARCH = "amd64"
         $env:CGO_ENABLED = "0"
         go build -ldflags "-s -w -X main.Version=${{ steps.set_version.outputs.version }}" -trimpath -buildmode=exe -o print_pdf.exe .
-        Write-Host "最適化ビルド完了"
+        Write-Host '最適化ビルド完了'
         
         # ファイルサイズとハッシュを表示
         $fileInfo = Get-Item print_pdf.exe
