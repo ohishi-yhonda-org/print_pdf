@@ -1,0 +1,9 @@
+{
+  "title": "Test Report",
+  "headers": ["Item", "Value"],
+  "data": [
+    ["Data1", "Value1"],
+    ["Data2", "Value2"],
+    ["Data3", "Value3"]
+  ]
+}

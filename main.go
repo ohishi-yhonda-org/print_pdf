@@ -1,77 +1,205 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"time"
 )
 
-func main() {
-	fmt.Println("PDF生成システム - Go版 (Windowsフォント対応)")
+// イベントログ書き込み関数
+func writeEventLog(level string, message string) {
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	logMessage := fmt.Sprintf("[%s] %s: %s", timestamp, level, message)
 
-	// テストデータの作成
-	testData := []Item{
-		{
-			Car:       "長崎100か4105",
-			Name:      "松本　俊之",
-			Purpose:   StringPtr("営業"),
-			StartDate: StringPtr("2024-12-17"),
-			EndDate:   StringPtr("2024-12-28"),
-			Price:     86900,
-			PayDay:    StringPtr("2025-01-06"),
-			Office:    StringPtr("本社㈲"),
-			Ryohi: []Ryohi{
-				{
-					Date:   StringPtr("2024-12-17"),
-					Dest:   StringPtr("滋賀"),
-					Detail: []string{"長崎", "大阪", "滋賀", "熊本"},
-					Kukan:  StringPtr("大型車_長崎_滋賀_往復_荷配　"),
-					Price:  IntPtr(21000),
-					Vol:    Float64Ptr(7.0),
-				},
-				{
-					Date:   StringPtr("2024-12-18"),
-					Dest:   StringPtr("福岡"),
-					Detail: []string{"長崎", "福岡"},
-					Kukan:  StringPtr("大型車_長崎_福岡_片荷_荷配　"),
-					Price:  IntPtr(2300),
-					Vol:    Float64Ptr(2.0),
-				},
-				{
-					Date:   StringPtr("2024-12-19"),
-					Dest:   StringPtr("三重"),
-					Detail: []string{"鹿児島", "三重", "滋賀", "長崎"},
-					Kukan:  StringPtr("大型車_長崎_三重_往復_荷配 |加算額_大型車_片荷_A　"),
-					Price:  IntPtr(26300),
-					Vol:    Float64Ptr(7.0),
-				},
-				{
-					Date:   StringPtr("2024-12-20"),
-					Dest:   StringPtr("福岡"),
-					Detail: []string{"長崎", "福岡"},
-					Kukan:  StringPtr("大型車_長崎_福岡_片荷_荷配　"),
-					Price:  IntPtr(5300),
-					Vol:    Float64Ptr(3.0),
-				},
-				{
-					Date:   StringPtr("2024-12-21"),
-					Dest:   StringPtr("埼玉"),
-					Detail: []string{"大阪", "埼玉", "茨城", "福岡"},
-					Kukan:  StringPtr("大型車_福岡_埼玉_往復_荷配 |加算額_大型車_往復_A　"),
-					Price:  IntPtr(32000),
-					Vol:    Float64Ptr(7.0),
-				},
-			},
-		},
+	// コンソール出力
+	fmt.Println(logMessage)
+
+	// 標準ログ出力（Windowsサービス時はイベントログに転送される）
+	log.Printf("%s: %s", level, message)
+
+	// ファイルログも出力（オプション）
+	writeToLogFile(logMessage)
+}
+
+// ログファイル書き込み関数
+func writeToLogFile(message string) {
+	logFile := "pdf_generator_service.log"
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Printf("ログファイル書き込みエラー: %v", err)
+		return
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(message + "\n")
+	if err != nil {
+		log.Printf("ログファイル書き込みエラー: %v", err)
+	}
+}
+
+// HTTPからデータを取得する関数
+func fetchDataFromAPI(url string) ([]Item, error) {
+	writeEventLog("INFO", fmt.Sprintf("APIからデータを取得開始: %s", url))
+
+	// HTTPクライアントの設定
+	client := &http.Client{
+		Timeout: 30 * time.Second,
 	}
 
-	fmt.Println("ReportLabスタイルPDF生成を開始...")
+	// HTTPリクエストを送信
+	resp, err := client.Get(url)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("HTTP リクエストエラー: %v", err))
+		return nil, fmt.Errorf("HTTP リクエストエラー: %v", err)
+	}
+	defer resp.Body.Close()
 
-	// ReportLabスタイル版を実行
-	reportlabClient := NewReportLabStylePdfClient(testData)
+	// レスポンスステータスをチェック
+	if resp.StatusCode != http.StatusOK {
+		writeEventLog("ERROR", fmt.Sprintf("HTTP エラー: %d %s", resp.StatusCode, resp.Status))
+		return nil, fmt.Errorf("HTTP エラー: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	// レスポンスボディを読み取り
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("レスポンス読み取りエラー: %v", err))
+		return nil, fmt.Errorf("レスポンス読み取りエラー: %v", err)
+	}
+
+	// JSONをパース
+	var data []Item
+	if err := json.Unmarshal(body, &data); err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("JSON パースエラー: %v", err))
+		return nil, fmt.Errorf("JSON パースエラー: %v", err)
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("データ取得完了: %d件", len(data)))
+	return data, nil
+}
+
+// HTTPハンドラー: PDF生成エンドポイント
+func generatePDFHandler(w http.ResponseWriter, r *http.Request) {
+	// CORSヘッダーを設定
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// OPTIONSリクエストの処理
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// POSTメソッドのみ許可
+	if r.Method != "POST" {
+		writeEventLog("WARN", fmt.Sprintf("不正なメソッドでのアクセス: %s from %s", r.Method, r.RemoteAddr))
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("PDF生成リクエストを受信 from %s", r.RemoteAddr))
+
+	// リクエストボディを読み取り
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("リクエストボディ読み取りエラー: %v", err))
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// JSONをパース
+	var requestData []Item
+	if err := json.Unmarshal(body, &requestData); err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("JSON パースエラー: %v", err))
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("受信データ: %d件のアイテム", len(requestData)))
+
+	// PDF生成処理
+	writeEventLog("INFO", "ReportLabスタイルPDF生成を開始")
+	reportlabClient := NewReportLabStylePdfClient(requestData)
+
 	if reportlabClient != nil {
-		fmt.Println("ReportLabスタイルPDF生成完了！")
-	} else {
-		fmt.Println("ReportLabスタイルPDF生成に失敗しました")
-	}
+		writeEventLog("INFO", "ReportLabスタイルPDF生成完了")
 
-	fmt.Println("\n処理完了！")
+		// 成功レスポンス
+		response := map[string]interface{}{
+			"status":  "success",
+			"message": "PDF generated successfully",
+			"items":   len(requestData),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	} else {
+		writeEventLog("ERROR", "ReportLabスタイルPDF生成に失敗")
+
+		// エラーレスポンス
+		response := map[string]interface{}{
+			"status":  "error",
+			"message": "Failed to generate PDF",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// ヘルスチェックエンドポイント
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	writeEventLog("INFO", fmt.Sprintf("ヘルスチェックアクセス from %s", r.RemoteAddr))
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"status":    "ok",
+		"service":   "PDF Generator",
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func main() {
+	writeEventLog("INFO", "PDF生成システム - Go版 (HTTPサーバーモード) 開始")
+	writeEventLog("INFO", "Windowsフォント対応")
+
+	// HTTPルートの設定
+	http.HandleFunc("/generate-pdf", generatePDFHandler)
+	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		writeEventLog("INFO", fmt.Sprintf("ルートアクセス from %s", r.RemoteAddr))
+		fmt.Fprintf(w, `
+PDF Generator API Server
+
+Available endpoints:
+- POST /generate-pdf : Generate PDF from JSON data
+- GET  /health       : Health check
+
+Example request:
+curl -X POST http://localhost:8081/generate-pdf \
+  -H "Content-Type: application/json" \
+  -d '[{"Car":"test","Name":"テスト","Ryohi":[]}]'
+`)
+	})
+
+	// サーバー起動
+	port := ":8081"
+	writeEventLog("INFO", fmt.Sprintf("HTTPサーバーを起動中... http://localhost%s", port))
+	writeEventLog("INFO", "PDF生成エンドポイント: POST /generate-pdf")
+	writeEventLog("INFO", "ヘルスチェック: GET /health")
+	writeEventLog("INFO", "サーバーを停止するには Ctrl+C を押してください")
+
+	// サーバー起動（ブロッキング）
+	if err := http.ListenAndServe(port, nil); err != nil {
+		writeEventLog("FATAL", fmt.Sprintf("サーバー起動エラー: %v", err))
+		log.Fatalf("サーバー起動エラー: %v", err)
+	}
 }

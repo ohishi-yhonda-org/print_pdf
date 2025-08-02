@@ -1,0 +1,24 @@
+[2025-08-02 16:22:17] INFO: PDF生成システム - Go版 (HTTPサーバーモード) 開始
+[2025-08-02 16:22:17] INFO: Windowsフォント対応
+[2025-08-02 16:22:17] INFO: HTTPサーバーを起動中... http://localhost:8081
+[2025-08-02 16:22:17] INFO: PDF生成エンドポイント: POST /generate-pdf
+[2025-08-02 16:22:17] INFO: ヘルスチェック: GET /health
+[2025-08-02 16:22:17] INFO: サーバーを停止するには Ctrl+C を押してください
+[2025-08-02 16:22:17] FATAL: サーバー起動エラー: listen tcp :8081: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+[2025-08-02 16:22:39] INFO: PDF生成システム - Go版 (HTTPサーバーモード) 開始
+[2025-08-02 16:22:39] INFO: Windowsフォント対応
+[2025-08-02 16:22:39] INFO: HTTPサーバーを起動中... http://localhost:8081
+[2025-08-02 16:22:39] INFO: PDF生成エンドポイント: POST /generate-pdf
+[2025-08-02 16:22:39] INFO: ヘルスチェック: GET /health
+[2025-08-02 16:22:39] INFO: サーバーを停止するには Ctrl+C を押してください
+[2025-08-02 16:22:39] FATAL: サーバー起動エラー: listen tcp :8081: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+[2025-08-02 16:26:45] INFO: PDF生成システム - Go版 (HTTPサーバーモード) 開始
+[2025-08-02 16:26:45] INFO: Windowsフォント対応
+[2025-08-02 16:26:45] INFO: HTTPサーバーを起動中... http://localhost:8081
+[2025-08-02 16:26:45] INFO: PDF生成エンドポイント: POST /generate-pdf
+[2025-08-02 16:26:45] INFO: ヘルスチェック: GET /health
+[2025-08-02 16:26:45] INFO: サーバーを停止するには Ctrl+C を押してください
+[2025-08-02 16:26:55] INFO: PDF生成リクエストを受信 from [::1]:8929
+[2025-08-02 16:26:55] INFO: 受信データ: 2件のアイテム
+[2025-08-02 16:26:55] INFO: ReportLabスタイルPDF生成を開始
+[2025-08-02 16:26:56] INFO: ReportLabスタイルPDF生成完了

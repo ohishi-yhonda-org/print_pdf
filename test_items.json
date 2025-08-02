@@ -1,0 +1,28 @@
+[
+  {
+    "car": "Vehicle001",
+    "name": "Test Item 1",
+    "purpose": "Business Meeting",
+    "startDate": "2025-08-01",
+    "endDate": "2025-08-02",
+    "price": 5000,
+    "tax": 500.0,
+    "description": "Test description for item 1",
+    "ryohi": [],
+    "office": "Tokyo Office",
+    "payDay": "2025-08-15"
+  },
+  {
+    "car": "Vehicle002",
+    "name": "Test Item 2",
+    "purpose": "Client Visit",
+    "startDate": "2025-08-03",
+    "endDate": "2025-08-03",
+    "price": 3000,
+    "tax": 300.0,
+    "description": "Test description for item 2",
+    "ryohi": [],
+    "office": "Osaka Office",
+    "payDay": "2025-08-20"
+  }
+]
