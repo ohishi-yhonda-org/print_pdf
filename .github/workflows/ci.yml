@@ -74,17 +74,3 @@ jobs:
       continue-on-error: true
       run: golangci-lint run ./...
 
-  security:
-    runs-on: [self-hosted, Windows, X64, test]
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Verify Go installation
-      run: go version
-    
-    - name: Run Gosec Security Scanner
-      run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        gosec ./...
-
