@@ -88,20 +88,40 @@ jobs:
   release:
     runs-on: [self-hosted, Windows, X64, test]
     needs: [test, lint]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event.inputs.create_release == 'true') || (github.ref == 'refs/heads/main' && github.event_name == 'push')
     
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Verify Go installation
+      run: go version
+    
+    - name: Re-run critical tests for release validation
+      run: |
+        echo "テストを再実行してリリース品質を検証中..."
+        go test -v ./...
+        echo "カバレッジテストを実行中..."
+        go test -v -race -coverprofile=coverage.out ./...
+        echo "すべてのテストが成功しました。リリース続行..."
     
     - name: Set version
       shell: powershell
       run: |
         if ("${{ github.event.inputs.version }}" -ne "" -and "${{ github.event.inputs.create_release }}" -eq "true") {
           $version = "${{ github.event.inputs.version }}"
-        } elseif ("${{ github.ref_name }}" -ne "") {
+        } elseif ("${{ github.ref_name }}" -match "^v\d+\.\d+\.\d+") {
           $version = "${{ github.ref_name }}"
         } else {
-          $version = "v1.0.0"
+          # mainブランチの場合、既存のタグをチェックして次のバージョンを生成
+          $latestTag = git describe --tags --abbrev=0 2>$null
+          if ($latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
+            $major = [int]$matches[1]
+            $minor = [int]$matches[2]
+            $patch = [int]$matches[3] + 1
+            $version = "v$major.$minor.$patch"
+          } else {
+            $version = "v1.0.0"
+          }
         }
         echo "VERSION=$version" >> $env:GITHUB_ENV
         echo "Building version: $version"

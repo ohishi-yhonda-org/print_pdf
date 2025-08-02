@@ -223,7 +223,7 @@ func checkForUpdates() {
 	// バージョン比較
 	if Version == "dev" || Version != latestVersion {
 		writeEventLog("INFO", fmt.Sprintf("新しいバージョンが利用可能: %s -> %s", Version, latestVersion))
-		
+
 		// 自動アップデートを実行
 		if performUpdate(release) {
 			writeEventLog("INFO", "アップデート完了。アプリケーションを再起動します...")
