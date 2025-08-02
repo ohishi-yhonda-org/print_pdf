@@ -2,21 +2,125 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
+	"os/exec"  
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
+
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/debug"
+	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 // Version information (set during build with -ldflags)
 var Version = "dev"
+
+// グローバル変数
+var (
+	httpServer *http.Server
+	elog       debug.Log
+)
+
+// Windowsサービスハンドラー
+type service struct{}
+
+func (m *service) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPauseAndContinue
+	changes <- svc.Status{State: svc.StartPending}
+	
+	// HTTPサーバーを起動
+	go startHTTPServer()
+	
+	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+	
+	// サービス制御メッセージを待機
+	for {
+		select {
+		case c := <-r:
+			switch c.Cmd {
+			case svc.Interrogate:
+				changes <- c.CurrentStatus
+			case svc.Stop, svc.Shutdown:
+				writeEventLog("INFO", "サービス停止要求を受信")
+				if httpServer != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					httpServer.Shutdown(ctx)
+				}
+				changes <- svc.Status{State: svc.StopPending}
+				return
+			case svc.Pause:
+				changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
+			case svc.Continue:
+				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+			default:
+				elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
+			}
+		}
+	}
+}
+
+// HTTPサーバー起動関数
+func startHTTPServer() {
+	writeEventLog("INFO", "PDF生成システム - Go版 (HTTPサーバーモード) 開始")
+	writeEventLog("INFO", fmt.Sprintf("バージョン: %s", Version))
+	writeEventLog("INFO", "Windowsフォント対応")
+
+	// 起動時に自動アップデートをチェック
+	go func() {
+		// 少し待ってから実行（サーバー起動後）
+		time.Sleep(5 * time.Second)
+		checkForUpdates()
+	}()
+
+	// HTTPルートの設定
+	http.HandleFunc("/generate-pdf", generatePDFHandler)
+	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		writeEventLog("INFO", fmt.Sprintf("ルートアクセス from %s", r.RemoteAddr))
+		fmt.Fprintf(w, `
+PDF Generator API Server %s
+
+Available endpoints:
+- POST /generate-pdf : Generate PDF from JSON data
+- GET  /health       : Health check
+
+Example request:
+curl -X POST http://localhost:8081/generate-pdf \
+  -H "Content-Type: application/json" \
+  -d '[{"car":"test","name":"テスト","ryohi":[]}]'
+
+Version: %s
+Platform: %s %s
+`, Version, Version, runtime.GOOS, runtime.GOARCH)
+	})
+
+	// サーバー起動
+	port := ":8081"
+	writeEventLog("INFO", fmt.Sprintf("HTTPサーバーを起動中... http://localhost%s", port))
+	writeEventLog("INFO", "PDF生成エンドポイント: POST /generate-pdf")
+	writeEventLog("INFO", "ヘルスチェック: GET /health")
+
+	httpServer = &http.Server{
+		Addr: port,
+	}
+
+	// サーバー起動
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		writeEventLog("FATAL", fmt.Sprintf("サーバー起動エラー: %v", err))
+		log.Fatalf("サーバー起動エラー: %v", err)
+	}
+}
 
 // GitHubリリース情報
 type GitHubRelease struct {
@@ -28,18 +132,29 @@ type GitHubRelease struct {
 	} `json:"assets"`
 }
 
-// イベントログ書き込み関数
+// イベントログ書き込み関数（Windowsサービス対応）
 func writeEventLog(level string, message string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logMessage := fmt.Sprintf("[%s] %s: %s", timestamp, level, message)
 
-	// コンソール出力
-	fmt.Println(logMessage)
+	// コンソール出力（デバッグモード時のみ）
+	if elog != nil {
+		switch level {
+		case "ERROR", "FATAL":
+			elog.Error(1, message)
+		case "WARN":
+			elog.Warning(1, message)
+		default:
+			elog.Info(1, message)
+		}
+	} else {
+		fmt.Println(logMessage)
+	}
 
-	// 標準ログ出力（Windowsサービス時はイベントログに転送される）
+	// 標準ログ出力
 	log.Printf("%s: %s", level, message)
 
-	// ファイルログも出力（オプション）
+	// ファイルログも出力
 	writeToLogFile(logMessage)
 }
 
@@ -389,49 +504,70 @@ func extractFile(file *zip.File, destPath string) error {
 }
 
 func main() {
-	writeEventLog("INFO", "PDF生成システム - Go版 (HTTPサーバーモード) 開始")
-	writeEventLog("INFO", fmt.Sprintf("バージョン: %s", Version))
-	writeEventLog("INFO", "Windowsフォント対応")
+	// Windowsサービスとして実行されているかチェック
+	isWindowsService, err := svc.IsWindowsService()
+	if err != nil {
+		log.Fatalf("サービス状態確認エラー: %v", err)
+	}
 
-	// 起動時に自動アップデートをチェック
-	go func() {
-		// 少し待ってから実行（サーバー起動後）
-		time.Sleep(5 * time.Second)
-		checkForUpdates()
+	if isWindowsService {
+		// Windowsサービスとして実行
+		runWindowsService()
+	} else {
+		// コンソールアプリケーションとして実行
+		runConsoleApp()
+	}
+}
+
+// Windowsサービスとして実行
+func runWindowsService() {
+	var err error
+	
+	// イベントログを開く（失敗しても続行）
+	elog, err = eventlog.Open("PDF Generator API Service")
+	if err != nil {
+		// イベントログが開けない場合はファイルログのみ使用
+		elog = nil
+		log.Printf("イベントログを開けませんでした: %v", err)
+	}
+	defer func() {
+		if elog != nil {
+			elog.Close()
+		}
 	}()
 
-	// HTTPルートの設定
-	http.HandleFunc("/generate-pdf", generatePDFHandler)
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		writeEventLog("INFO", fmt.Sprintf("ルートアクセス from %s", r.RemoteAddr))
-		fmt.Fprintf(w, `
-PDF Generator API Server %s
+	writeEventLog("INFO", "PDF Generator API Service をWindowsサービスとして開始")
 
-Available endpoints:
-- POST /generate-pdf : Generate PDF from JSON data
-- GET  /health       : Health check
+	err = svc.Run("PDF Generator API Service", &service{})
+	if err != nil {
+		writeEventLog("FATAL", fmt.Sprintf("サービス実行エラー: %v", err))
+		log.Fatalf("サービス実行エラー: %v", err)
+	}
+}
 
-Example request:
-curl -X POST http://localhost:8081/generate-pdf \
-  -H "Content-Type: application/json" \
-  -d '[{"car":"test","name":"テスト","ryohi":[]}]'
-
-Version: %s
-Platform: %s %s
-`, Version, Version, runtime.GOOS, runtime.GOARCH)
-	})
-
-	// サーバー起動
-	port := ":8081"
-	writeEventLog("INFO", fmt.Sprintf("HTTPサーバーを起動中... http://localhost%s", port))
-	writeEventLog("INFO", "PDF生成エンドポイント: POST /generate-pdf")
-	writeEventLog("INFO", "ヘルスチェック: GET /health")
+// コンソールアプリケーションとして実行
+func runConsoleApp() {
+	writeEventLog("INFO", "PDF Generator をコンソールアプリケーションとして開始")
 	writeEventLog("INFO", "サーバーを停止するには Ctrl+C を押してください")
 
-	// サーバー起動（ブロッキング）
-	if err := http.ListenAndServe(port, nil); err != nil {
-		writeEventLog("FATAL", fmt.Sprintf("サーバー起動エラー: %v", err))
-		log.Fatalf("サーバー起動エラー: %v", err)
+	// シグナルハンドリング
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// HTTPサーバーを別goroutineで起動
+	go startHTTPServer()
+
+	// 終了シグナルを待機
+	<-sigChan
+	writeEventLog("INFO", "終了シグナルを受信。サーバーを停止中...")
+
+	if httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(ctx); err != nil {
+			writeEventLog("ERROR", fmt.Sprintf("サーバー停止エラー: %v", err))
+		}
 	}
+
+	writeEventLog("INFO", "サーバーが正常に停止しました")
 }
