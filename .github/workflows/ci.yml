@@ -72,7 +72,7 @@ jobs:
         name: codecov-umbrella
     
     - name: Build application (optimized for security)
-      run: go build -ldflags "-s -w -trimpath" -v ./...
+      run: go build -ldflags "-s -w" -trimpath -v ./...
       env:
         GOOS: windows
         GOARCH: amd64
@@ -99,8 +99,8 @@ jobs:
   release:
     runs-on: [self-hosted, Windows, X64, test]
     needs: [test, lint]
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event.inputs.create_release == 'true') || (github.ref == 'refs/heads/main' && github.event_name == 'push')
-    
+    if: (github.event.inputs.create_release == 'true') || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+
     steps:
     - uses: actions/checkout@v4
     
@@ -111,7 +111,7 @@ jobs:
       run: |
         echo "リリース前の軽量テストを実行中..."
         echo "testジョブで既にテスト済みのため、ビルド確認のみ実行..."
-        go build -ldflags "-s -w -trimpath" -v ./...
+        go build -ldflags "-s -w" -trimpath -v ./...
         echo "リリース品質検証完了。リリース続行..."
       env:
         GOOS: windows
@@ -146,7 +146,7 @@ jobs:
         $env:GOOS = "windows"
         $env:GOARCH = "amd64"
         $env:CGO_ENABLED = "0"
-        go build -ldflags "-s -w -trimpath -X main.Version=${{ steps.set_version.outputs.version }}" -buildmode=exe -o print_pdf.exe .
+        go build -ldflags "-s -w -X main.Version=${{ steps.set_version.outputs.version }}" -trimpath -buildmode=exe -o print_pdf.exe .
         echo "最適化ビルド完了"
         
         # ファイルサイズとハッシュを表示
