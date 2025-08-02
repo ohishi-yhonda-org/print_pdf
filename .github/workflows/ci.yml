@@ -45,6 +45,7 @@ jobs:
       env:
         GOOS: windows
         GOARCH: amd64
+        CGO_ENABLED: 0
 
     - name: Run tests with coverage
       continue-on-error: true
@@ -52,6 +53,7 @@ jobs:
       env:
         GOOS: windows
         GOARCH: amd64
+        CGO_ENABLED: 0
 
     - name: Display coverage
       run: |
@@ -69,8 +71,12 @@ jobs:
         flags: unittests
         name: codecov-umbrella
     
-    - name: Build application
-      run: go build -v ./...
+    - name: Build application (optimized for security)
+      run: go build -ldflags "-s -w -trimpath" -v ./...
+      env:
+        GOOS: windows
+        GOARCH: amd64
+        CGO_ENABLED: 0
 
   lint:
     runs-on: [self-hosted, Windows, X64, test]
@@ -105,8 +111,12 @@ jobs:
       run: |
         echo "リリース前の軽量テストを実行中..."
         echo "testジョブで既にテスト済みのため、ビルド確認のみ実行..."
-        go build -v ./...
+        go build -ldflags "-s -w -trimpath" -v ./...
         echo "リリース品質検証完了。リリース続行..."
+      env:
+        GOOS: windows
+        GOARCH: amd64
+        CGO_ENABLED: 0
     
     - name: Set version
       id: set_version
@@ -129,15 +139,30 @@ jobs:
         echo "VERSION=$version" >> $env:GITHUB_ENV
         echo "Building version: $version"
     
-    - name: Build release executable
+    - name: Build release executable (Anti-Virus Optimized)
       shell: powershell
       run: |
-        go build -ldflags "-X main.Version=${{ steps.set_version.outputs.version }}" -o print_pdf.exe .
+        echo "ウイルス対策ソフト誤検知を減らす最適化ビルドを実行中..."
+        $env:GOOS = "windows"
+        $env:GOARCH = "amd64"
+        $env:CGO_ENABLED = "0"
+        go build -ldflags "-s -w -trimpath -X main.Version=${{ steps.set_version.outputs.version }}" -buildmode=exe -o print_pdf.exe .
+        echo "最適化ビルド完了"
+        
+        # ファイルサイズとハッシュを表示
+        $fileInfo = Get-Item print_pdf.exe
+        echo "ファイルサイズ: $($fileInfo.Length) bytes"
+        $hash = Get-FileHash print_pdf.exe -Algorithm SHA256
+        echo "SHA256: $($hash.Hash)"
     
     - name: Create zip archive
       shell: powershell
       run: |
         Compress-Archive -Path print_pdf.exe, service_manager.bat -DestinationPath print_pdf_${{ steps.set_version.outputs.version }}.zip
+        
+        # ZIPファイルの情報も表示
+        $zipInfo = Get-Item print_pdf_${{ steps.set_version.outputs.version }}.zip
+        echo "ZIPファイルサイズ: $($zipInfo.Length) bytes"
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
@@ -150,6 +175,12 @@ jobs:
         body: |
           自動ビルドされたPDF Generator ${{ steps.set_version.outputs.version }}
           
+          ## 🛡️ セキュリティ最適化
+          - ウイルス対策ソフト誤検知を減らす最適化ビルド
+          - デバッグシンボル削除 (-s -w)
+          - ビルドパス情報削除 (-trimpath)
+          - CGO無効化でクリーンビルド
+          
           ## 機能
           - HTTP API サーバー機能 (ポート8081)
           - PDF生成機能（日本語フォント対応）
@@ -160,7 +191,14 @@ jobs:
           ## インストール方法
           1. print_pdf_${{ steps.set_version.outputs.version }}.zip をダウンロード
           2. 解凍して適切なフォルダに配置
-          3. service_manager.bat でWindowsサービスとして登録
+          3. Windows Defenderで除外設定 (必要に応じて)
+          4. service_manager.bat でWindowsサービスとして登録
+          
+          ## ウイルス対策ソフト対応
+          このバイナリはGoで作成されており、一部のウイルス対策ソフトで誤検知される場合があります。
+          その場合は以下を実行してください：
+          - Windows Defender: 設定 → ウイルスと脅威の防止 → 除外 → ファイルを除外
+          - 信頼できないファイルとして報告された場合、VirusTotal等で検証可能
           
           ## API エンドポイント
           - POST /generate-pdf : PDF生成
