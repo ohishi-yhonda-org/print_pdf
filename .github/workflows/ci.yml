@@ -16,6 +16,11 @@ on:
         required: false
         default: 'v1.0.0'
 
+permissions:
+  contents: write
+  actions: read
+  checks: write
+
 jobs:
   test:
     runs-on: [self-hosted, Windows, X64, test]
@@ -135,13 +140,13 @@ jobs:
         Compress-Archive -Path print_pdf.exe, service_manager.bat -DestinationPath print_pdf_${{ steps.set_version.outputs.version }}.zip
     
     - name: Create Release
-      uses: actions/create-release@v1
-      id: create_release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.create_release == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.set_version.outputs.version }}
-        release_name: PDF Generator ${{ steps.set_version.outputs.version }}
+        name: PDF Generator ${{ steps.set_version.outputs.version }}
         body: |
           自動ビルドされたPDF Generator ${{ steps.set_version.outputs.version }}
           
@@ -162,14 +167,6 @@ jobs:
           - GET /health : ヘルスチェック
         draft: false
         prerelease: false
-    
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./print_pdf_${{ steps.set_version.outputs.version }}.zip
-        asset_name: print_pdf_${{ steps.set_version.outputs.version }}.zip
-        asset_content_type: application/zip
+        files: |
+          print_pdf_${{ steps.set_version.outputs.version }}.zip
 
