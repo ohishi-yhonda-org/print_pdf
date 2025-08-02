@@ -104,36 +104,35 @@ jobs:
         echo "リリース品質検証完了。リリース続行..."
     
     - name: Set version
+      id: set_version
       shell: powershell
       run: |
         if ("${{ github.event.inputs.version }}" -ne "" -and "${{ github.event.inputs.create_release }}" -eq "true") {
           $version = "${{ github.event.inputs.version }}"
+          echo "手動指定バージョン: $version"
         } elseif ("${{ github.ref_name }}" -match "^v\d+\.\d+\.\d+") {
           $version = "${{ github.ref_name }}"
+          echo "タグバージョン: $version"
         } else {
-          # mainブランチの場合、既存のタグをチェックして次のバージョンを生成
-          $latestTag = git describe --tags --abbrev=0 2>$null
-          if ($latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
-            $major = [int]$matches[1]
-            $minor = [int]$matches[2]
-            $patch = [int]$matches[3] + 1
-            $version = "v$major.$minor.$patch"
-          } else {
-            $version = "v1.0.0"
-          }
+          # mainブランチの場合、日付ベースのバージョン
+          $date = Get-Date -Format "yyyyMMdd"
+          $time = Get-Date -Format "HHmm"
+          $version = "v1.0.0-dev.$date.$time"
+          echo "開発バージョン: $version"
         }
+        echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "VERSION=$version" >> $env:GITHUB_ENV
         echo "Building version: $version"
     
     - name: Build release executable
       shell: powershell
       run: |
-        go build -ldflags "-X main.Version=$env:VERSION" -o print_pdf.exe .
+        go build -ldflags "-X main.Version=${{ steps.set_version.outputs.version }}" -o print_pdf.exe .
     
     - name: Create zip archive
       shell: powershell
       run: |
-        Compress-Archive -Path print_pdf.exe, service_manager.bat -DestinationPath print_pdf_$env:VERSION.zip
+        Compress-Archive -Path print_pdf.exe, service_manager.bat -DestinationPath print_pdf_${{ steps.set_version.outputs.version }}.zip
     
     - name: Create Release
       uses: actions/create-release@v1
@@ -141,10 +140,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ env.VERSION }}
-        release_name: PDF Generator ${{ env.VERSION }}
+        tag_name: ${{ steps.set_version.outputs.version }}
+        release_name: PDF Generator ${{ steps.set_version.outputs.version }}
         body: |
-          自動ビルドされたPDF Generator ${{ env.VERSION }}
+          自動ビルドされたPDF Generator ${{ steps.set_version.outputs.version }}
           
           ## 機能
           - HTTP API サーバー機能 (ポート8081)
@@ -154,7 +153,7 @@ jobs:
           - Windowsサービス対応
           
           ## インストール方法
-          1. print_pdf_${{ env.VERSION }}.zip をダウンロード
+          1. print_pdf_${{ steps.set_version.outputs.version }}.zip をダウンロード
           2. 解凍して適切なフォルダに配置
           3. service_manager.bat でWindowsサービスとして登録
           
@@ -170,7 +169,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./print_pdf_${{ env.VERSION }}.zip
-        asset_name: print_pdf_${{ env.VERSION }}.zip
+        asset_path: ./print_pdf_${{ steps.set_version.outputs.version }}.zip
+        asset_name: print_pdf_${{ steps.set_version.outputs.version }}.zip
         asset_content_type: application/zip
 
