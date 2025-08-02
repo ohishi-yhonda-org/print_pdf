@@ -21,13 +21,13 @@ func TestTruncateText(t *testing.T) {
 			name:      "長いテキスト - 切り詰め必要",
 			input:     "これは非常に長いテキストで切り詰めが必要です",
 			maxLength: 10,
-			expected:  "これは非常に長いテ...",
+			expected:  "これは非常に長...",
 		},
 		{
 			name:      "英語テキスト - 切り詰め必要",
 			input:     "This is a very long English text that needs truncation",
 			maxLength: 15,
-			expected:  "This is a very ...",
+			expected:  "This is a ve...",
 		},
 		{
 			name:      "空文字列",
@@ -51,7 +51,7 @@ func TestTruncateText(t *testing.T) {
 			name:      "区間テスト - 長すぎるケース",
 			input:     "東京駅→新横浜駅→名古屋駅→京都駅→新大阪駅→広島駅→博多駅",
 			maxLength: 22,
-			expected:  "東京駅→新横浜駅→名古屋駅→京都駅...",
+			expected:  "東京駅→新横浜駅→名古屋駅→京都駅→新...",
 		},
 		{
 			name:      "行先テスト - 短いケース",
@@ -63,7 +63,7 @@ func TestTruncateText(t *testing.T) {
 			name:      "行先テスト - 長いケース",
 			input:     "東京都千代田区丸の内",
 			maxLength: 8,
-			expected:  "東京都千代田区...",
+			expected:  "東京都千代...",
 		},
 		{
 			name:      "摘要テスト - 複数項目",
@@ -89,7 +89,7 @@ func TestTruncateTextEdgeCases(t *testing.T) {
 	t.Run("絵文字を含むテキスト", func(t *testing.T) {
 		input := "会議🚀資料📝作成✨完了🎉"
 		result := truncateText(input, 5)
-		expected := "会議🚀資料📝..."
+		expected := "会議..."
 		if result != expected {
 			t.Errorf("truncateText(%q, 5) = %q, expected %q", input, result, expected)
 		}
@@ -108,7 +108,7 @@ func TestTruncateTextEdgeCases(t *testing.T) {
 	t.Run("maxLength + 1の長さ", func(t *testing.T) {
 		input := "123456"
 		result := truncateText(input, 5)
-		expected := "12345..."
+		expected := "12..."
 		if result != expected {
 			t.Errorf("truncateText(%q, 5) = %q, expected %q", input, result, expected)
 		}

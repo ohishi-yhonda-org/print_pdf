@@ -118,11 +118,22 @@ func (c *ReportLabStylePdfClient) setupWindowsFont() error {
 
 // truncateText - テキストを指定された文字数で切り詰める
 func truncateText(text string, maxLength int) string {
-	if len([]rune(text)) > maxLength {
-		textRunes := []rune(text)
-		return string(textRunes[:maxLength])
+	if maxLength <= 0 {
+		return "..."
 	}
-	return text
+	
+	textRunes := []rune(text)
+	if len(textRunes) <= maxLength {
+		return text
+	}
+	
+	// 省略記号分を考慮
+	if maxLength <= 3 {
+		return "..."
+	}
+	
+	// maxLengthより長い場合は切り詰めて...を追加
+	return string(textRunes[:maxLength-3]) + "..."
 }
 
 // drawLine - ReportLabスタイルのページ枠線とテーブルを描画

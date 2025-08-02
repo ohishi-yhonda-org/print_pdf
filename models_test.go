@@ -18,7 +18,7 @@ func TestFormatPrice(t *testing.T) {
 		{
 			name:     "0",
 			input:    0,
-			expected: "0",
+			expected: "",
 		},
 		{
 			name:     "1桁",

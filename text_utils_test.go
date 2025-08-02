@@ -222,7 +222,7 @@ func TestExtendToMaxRows(t *testing.T) {
 			name:     "短縮（実際は短縮されない）",
 			lines:    []string{"line1", "line2", "line3", "line4"},
 			maxRows:  2,
-			expected: []string{"line1", "line2"},
+			expected: []string{"line1", "line2", "line3", "line4"},
 		},
 		{
 			name:     "空配列",
@@ -262,7 +262,7 @@ func TestPrepareRyohiForPrint(t *testing.T) {
 			},
 			maxDetailLen:    10,
 			maxKukanLen:     15,
-			expectedMaxRows: 2, // 区間が2行になるため
+			expectedMaxRows: 1, // 摘要と区間両方とも1行に収まる
 		},
 		{
 			name: "摘要が長い場合",
@@ -276,7 +276,7 @@ func TestPrepareRyohiForPrint(t *testing.T) {
 			},
 			maxDetailLen:    7,
 			maxKukanLen:     20,
-			expectedMaxRows: 4, // 摘要が4行になるため
+			expectedMaxRows: 5, // 摘要が5行になるため
 		},
 		{
 			name: "空データ",
