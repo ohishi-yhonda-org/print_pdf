@@ -58,14 +58,14 @@ if "%VERSION%"=="" (
     echo Using specified version: %VERSION%
 )
 
-echo 🚀 Creating release tag and pushing: %VERSION%
+echo 🚀 Pushing changes and creating release tag: %VERSION%
 
-:: Push main branch and create tag in one operation
+:: Push changes to main first, then create and push tag  
 git push origin main
 git tag %VERSION%
 git push origin %VERSION%
 
-echo ✅ Changes and release tag %VERSION% pushed
+echo ✅ Changes pushed and release tag %VERSION% created
 
 :: Step 4: Open GitHub Actions page
 echo.

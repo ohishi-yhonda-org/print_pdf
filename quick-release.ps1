@@ -22,7 +22,7 @@ try {
     Write-Host "⚠️  No changes to commit or commit failed" -ForegroundColor Yellow
 }
 
-# Step 2: Generate and push release tag
+# Step 2: Generate and create release tag
 if ([string]::IsNullOrWhiteSpace($Version)) {
     Write-Host "🔄 Generating next release version..." -ForegroundColor Yellow
     
@@ -51,21 +51,22 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
         Write-Host "Generated version: $Version" -ForegroundColor Green
     } else {
         # Fallback version if no tags found - use v1.0.14 based on existing tags
-        $Version = "v1.0.14"
+        $Version = "v1.0.14"  
         Write-Host "Using fallback version: $Version" -ForegroundColor Yellow
     }
 } else {
     Write-Host "Using specified version: $Version" -ForegroundColor Cyan
 }
 
-Write-Host "🚀 Creating release tag and pushing: $Version" -ForegroundColor Yellow
+# Step 3: Push changes and create release tag
+Write-Host "🚀 Pushing changes and creating release tag: $Version" -ForegroundColor Yellow
 
-# Push main branch and create tag in one operation
+# Push changes to main first, then create and push tag
 git push origin main
 git tag $Version
 git push origin $Version
 
-Write-Host "✅ Changes and release tag $Version pushed" -ForegroundColor Green
+Write-Host "✅ Changes pushed and release tag $Version created" -ForegroundColor Green
 
 # Step 4: Open GitHub Actions page
 Write-Host "🌐 Opening GitHub Actions page..." -ForegroundColor Yellow

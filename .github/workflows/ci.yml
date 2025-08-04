@@ -99,7 +99,7 @@ jobs:
   release:
     runs-on: [self-hosted, Windows, X64, test]
     needs: [test, lint]
-    if: (github.event.inputs.create_release == 'true') || (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    if: (github.event.inputs.create_release == 'true') || (startsWith(github.ref, 'refs/tags/v'))
 
     steps:
     - uses: actions/checkout@v4
@@ -125,43 +125,12 @@ jobs:
         if ("${{ github.event.inputs.version }}" -ne "" -and "${{ github.event.inputs.create_release }}" -eq "true") {
           $version = "${{ github.event.inputs.version }}"
           Write-Host "Manual version: $version"
-        } elseif ("${{ github.ref_name }}" -match "^v\d+\.\d+\.\d+") {
+        } elseif ("${{ github.ref_type }}" -eq "tag" -and "${{ github.ref_name }}" -match "^v\d+\.\d+\.\d+") {
           $version = "${{ github.ref_name }}"
           Write-Host "Tag version: $version"
         } else {
-          # mainブランチの場合、最新タグから次のバージョンを生成
-          try {
-            $gitOutput = & "C:\Program Files\Git\bin\git.exe" tag --sort=-version:refname 2>$null
-            $latestTag = $gitOutput | Select-Object -First 1
-            Write-Host "Latest tag found: $latestTag"
-          } catch {
-            Write-Host "Git command failed, trying alternative path"
-            try {
-              $gitOutput = & git tag --sort=-version:refname 2>$null
-              $latestTag = $gitOutput | Select-Object -First 1
-              Write-Host "Latest tag found: $latestTag"
-            } catch {
-              Write-Host "Git not found, using fallback"
-              $latestTag = $null
-            }
-          }
-          
-          if ($latestTag -and $latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
-            $major = [int]$matches[1]
-            $minor = [int]$matches[2]
-            $patch = [int]$matches[3] + 1
-            $date = Get-Date -Format "yyyyMMdd"
-            $time = Get-Date -Format "HHmm"
-            $version = "v$major.$minor.$patch-dev.$date.$time"
-            Write-Host "Generated incremental version: $version"
-          } else {
-            # タグが見つからない場合のフォールバック
-            $date = Get-Date -Format "yyyyMMdd"
-            $time = Get-Date -Format "HHmm"
-            $version = "v1.0.14-dev.$date.$time"
-            Write-Host "Using fallback version: $version"
-          }
-          Write-Host "Development version: $version"
+          Write-Host "Not a valid release tag or manual trigger"
+          $version = "dev"
         }
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "VERSION=$version" >> $env:GITHUB_ENV
@@ -194,7 +163,7 @@ jobs:
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
-      if: (github.event.inputs.create_release == 'true' || github.ref == 'refs/heads/main') && !contains(steps.set_version.outputs.version, '-dev.')
+      if: (github.event.inputs.create_release == 'true') || (startsWith(github.ref, 'refs/tags/v') && !contains(steps.set_version.outputs.version, '-dev.'))
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
