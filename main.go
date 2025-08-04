@@ -661,7 +661,17 @@ func checkForUpdates() {
 		// 自動アップデートを実行
 		if performUpdate(release) {
 			writeEventLog("INFO", "アップデート完了。アプリケーションを再起動します...")
-			os.Exit(0) // 正常終了してサービス管理で再起動される
+			
+			// サービスとして実行中の場合は、サービスマネージャーに正常終了を通知
+			isWindowsService, err := svc.IsWindowsService()
+			if err == nil && isWindowsService {
+				writeEventLog("INFO", "サービスとして実行中のため、サービスマネージャーに終了を通知します")
+				// サービスの正常終了（サービスマネージャーが自動的に再起動する）
+				os.Exit(0)
+			} else {
+				writeEventLog("INFO", "コンソールアプリケーションとして実行中のため、バッチファイルで再起動します")
+				os.Exit(0)
+			}
 		}
 	} else {
 		writeEventLog("INFO", "最新バージョンを使用中です")
@@ -754,13 +764,24 @@ func extractUpdate(zipPath string) error {
 			}
 
 			// バッチファイルでファイル置換を実行（Windowsでは実行中のファイルを置換できないため）
+			// サービスとして実行中かどうかを判定して適切な再起動方法を選択
+			var startCommand string
+			isWindowsService, err := svc.IsWindowsService()
+			if err == nil && isWindowsService {
+				// サービスとして実行中の場合はサービス再起動
+				startCommand = `sc start "PDF Generator API Service"`
+			} else {
+				// コンソールアプリケーションとして実行中の場合は直接起動
+				startCommand = fmt.Sprintf(`start "" "%s"`, currentExe)
+			}
+
 			batchContent := fmt.Sprintf(`@echo off
 timeout /t 2 /nobreak >nul
 move "%s" "%s"
 move "%s" "%s"
-start "" "%s"
+%s
 del "%%~f0"
-`, currentExe+".new", currentExe, backupPath, currentExe+".old", currentExe)
+`, currentExe+".new", currentExe, backupPath, currentExe+".old", startCommand)
 
 			batchFile := "update_replace.bat"
 			if err := os.WriteFile(batchFile, []byte(batchContent), 0755); err != nil {

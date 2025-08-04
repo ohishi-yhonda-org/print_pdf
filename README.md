@@ -316,7 +316,37 @@ git push origin v1.0.1
 3. 新しいバージョンが存在する場合、zipファイルをダウンロード
 4. 現在の実行ファイルをバックアップ
 5. 新しいファイルで置換
-6. アプリケーションを自動再起動
+6. **実行モードに応じた適切な再起動**:
+   - **Windowsサービス**: サービスマネージャーによる自動再起動
+   - **コンソールアプリ**: バッチファイルによる直接再起動
+
+#### ⚠️ 自動アップデートの注意事項
+
+**Windowsサービスとして実行時:**
+- アップデート後はサービスとして正常に再起動されます
+- プリンター設定やログオンアカウント設定は保持されます
+- サービス停止→ファイル更新→サービス再開の流れで実行されます
+
+**コンソールアプリケーションとして実行時:**
+- バッチファイルによる自動再起動が実行されます
+- 現在のユーザー権限でそのまま再起動されます
+
+**アップデート無効化:**
+```bash
+# 開発環境では自動アップデートは無効
+# Version = "dev" の場合、アップデートチェックをスキップ
+```
+
+**手動アップデート:**
+```bash
+# 自動アップデートを無効にして手動更新したい場合
+# 1. サービスを停止
+service_manager.bat stop
+
+# 2. 新しいファイルで置換
+# 3. サービスを再開  
+service_manager.bat start
+```
 
 ## Windowsサービス管理
 
@@ -339,6 +369,67 @@ service_manager.bat status
 
 # ログを表示
 service_manager.bat logs
+```
+
+### ⚠️ 重要: プリンター印刷機能を使用する場合の設定
+
+**Windowsサービスとして起動する場合、プリンター印刷機能を正常に動作させるためには、サービスのログオンアカウントを設定する必要があります。**
+
+#### 問題
+- デフォルトのシステムアカウント（Local System）ではプリンターへのアクセスができません
+- 印刷ジョブの送信に失敗し、「プリンターを初期化できませんでした」エラーが発生します
+
+#### 解決方法
+
+**方法1: サービス管理コンソールから設定**
+1. `services.msc` を管理者として実行
+2. 「PDF Generator API Service」を見つけて右クリック → プロパティ
+3. 「ログオン」タブを選択
+4. 「アカウント」を選択して、以下のいずれかを設定：
+   - **推奨**: 現在のユーザーアカウント（プリンターが設定済み）
+   - ドメインアカウント（プリンター設定権限がある場合）
+5. パスワードを入力
+6. 「OK」をクリック
+7. サービスを再起動
+
+**方法2: PowerShellコマンドで設定**
+```powershell
+# 管理者権限でPowerShellを起動して実行
+$serviceName = "PDF Generator API Service"
+$username = ".\your-username"  # または "DOMAIN\username"
+$password = "your-password"
+
+# サービスのログオンアカウントを変更
+$service = Get-WmiObject -Class Win32_Service -Filter "Name='$serviceName'"
+$service.Change($null,$null,$null,$null,$null,$null,$username,$password)
+
+# サービスを再起動
+Restart-Service $serviceName
+```
+
+#### 設定確認方法
+```bash
+# ヘルスチェックでサービス状態を確認
+curl http://localhost:8081/health
+
+# プリンター一覧を確認（PowerShell）
+Get-Printer | Select-Object Name, DriverName, PortName
+
+# テスト印刷を実行
+curl -X POST http://localhost:8081/print \
+  -F "document=@test.pdf" \
+  -F "printer=LBP221-futo"
+```
+
+#### 代替案: コンソールアプリケーションとして実行
+プリンター設定が複雑な場合は、サービスではなくコンソールアプリケーションとして起動することも可能：
+```cmd
+# 直接実行（現在のユーザー権限で起動）
+print_pdf.exe
+
+# またはタスクスケジューラで自動起動設定
+# - システム起動時に実行
+# - ユーザーログオン時に実行
 ```
 
 ## ログ
