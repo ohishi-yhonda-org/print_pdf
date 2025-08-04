@@ -6,7 +6,21 @@
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(git add:*)",
       "WebFetch(domain:github.com)",
-      "Bash(gh workflow:*)"
+      "Bash(gh workflow:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh release:*)",
+      "Bash(gh api:*)",
+      "Bash(go run:*)",
+      "Bash(curl:*)",
+      "Bash(SumatraPDF-3.5.2-64.exe travel_expense_reportlab_style.pdf)",
+      "Bash(./SumatraPDF-3.5.2-64.exe travel_expense_reportlab_style.pdf)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(go build:*)",
+      "Bash(rg:*)",
+      "Bash(findstr:*)",
+      "Bash(./print_pdf_fixed.exe)"
     ],
     "deny": []
   }
