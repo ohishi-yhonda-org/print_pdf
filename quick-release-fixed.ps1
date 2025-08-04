@@ -1,4 +1,4 @@
-# Quick Release Script
+﻿# Quick Release Script
 # Usage: .\quick-release.ps1 [version]
 # Example: .\quick-release.ps1 v1.0.15
 
