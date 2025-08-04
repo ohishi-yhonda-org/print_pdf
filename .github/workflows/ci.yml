@@ -127,7 +127,7 @@ jobs:
           $latestTag = $response | Where-Object { $_.tag_name -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1 | Select-Object -ExpandProperty tag_name
           
           if ($latestTag) {
-            Write-Host "Latest release tag found: $latestTag"
+            Write-Host ('Latest release tag found: ' + $latestTag)
           } else {
             Write-Host 'No valid release tags found'
           }
@@ -141,24 +141,24 @@ jobs:
           $major = [int]$matches[1]
           $minor = [int]$matches[2]
           $patch = [int]$matches[3] + 1
-          $newVersion = "v$major.$minor.$patch"
+          $newVersion = 'v' + $major + '.' + $minor + '.' + $patch
         } else {
-          $newVersion = "v1.0.0"
+          $newVersion = 'v1.0.0'
         }
         
-        Write-Host "Generated version: $newVersion"
-        echo "version=$newVersion" >> $env:GITHUB_OUTPUT
+        Write-Host ('Generated version: ' + $newVersion)
+        echo ('version=' + $newVersion) >> $env:GITHUB_OUTPUT
     
     - name: Create release with GitHub API
       shell: powershell
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        $version = "${{ steps.version.outputs.version }}"
-        Write-Host "Creating release: $version"
+        $version = '${{ steps.version.outputs.version }}'
+        Write-Host ('Creating release: ' + $version)
         
         # リリース説明文を準備
-        $releaseNotes = "自動生成されたリリース $version`n`n"
+        $releaseNotes = '自動生成されたリリース ' + $version + "`n`n"
         $releaseNotes += "## 🤖 CI自動リリース`n"
         $releaseNotes += "- テスト/Lint通過後の自動リリース`n"
         $releaseNotes += "- [release]フラグ付きコミットでトリガー`n`n"
@@ -178,8 +178,8 @@ jobs:
           
           $body = @{
             tag_name = $version
-            target_commitish = "main"
-            name = "PDF Generator $version"
+            target_commitish = 'main'
+            name = 'PDF Generator ' + $version
             body = $releaseNotes
             draft = $false
             prerelease = $false
@@ -187,7 +187,7 @@ jobs:
           
           $apiUrl = "https://api.github.com/repos/${{ github.repository }}/releases"
           $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $body
-          Write-Host "Release $version created successfully"
+          Write-Host ('Release ' + $version + ' created successfully')
         } catch {
           Write-Host 'Failed to create release: ' + $_
           exit 1
