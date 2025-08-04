@@ -541,20 +541,29 @@ func PrintPDFWithSumatra(pdfPath string, printerName string) error {
 
 // getSumatraPDFPath - SumatraPDFの実行ファイルパスを取得
 func getSumatraPDFPath() (string, error) {
-	// 現在のディレクトリでSumatraPDFを探す
+	// 複数の場所でSumatraPDFを探す
+	searchPaths := []string{
+		".", // 現在のディレクトリ
+		"C:\\", // Cドライブルート（サービス実行時用）
+	}
+	
 	candidates := []string{
 		"SumatraPDF-3.5.2-64.exe",
 		"SumatraPDF.exe",
 	}
 
-	for _, candidate := range candidates {
-		// 絶対パスに変換
-		absPath, err := filepath.Abs(candidate)
-		if err != nil {
-			continue
-		}
-		if _, err := os.Stat(absPath); err == nil {
-			return absPath, nil
+	for _, searchPath := range searchPaths {
+		for _, candidate := range candidates {
+			// パスを結合
+			fullPath := filepath.Join(searchPath, candidate)
+			// 絶対パスに変換
+			absPath, err := filepath.Abs(fullPath)
+			if err != nil {
+				continue
+			}
+			if _, err := os.Stat(absPath); err == nil {
+				return absPath, nil
+			}
 		}
 	}
 
