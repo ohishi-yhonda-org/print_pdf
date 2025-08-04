@@ -491,8 +491,8 @@ func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
 	// プリンター名を取得
 	printerName := r.FormValue("printer")
 	if printerName == "" {
-		writeEventLog("WARN", "プリンター名が指定されていません")
-		printerName = "default" // デフォルトプリンター
+		writeEventLog("WARN", "プリンター名が指定されていません。デフォルトプリンターを使用します。")
+		// printerNameを空文字列のままにしてデフォルトプリンターを使用
 	}
 
 	// PDFファイルを取得
