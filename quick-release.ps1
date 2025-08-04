@@ -6,6 +6,11 @@ param(
     [string]$Version = ""
 )
 
+# UTF-8エンコーディング設定
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$env:LC_ALL = "C.UTF-8"
+
 Write-Host "🚀 Quick Release Script Starting..." -ForegroundColor Green
 
 # Step 0: Confirm release intention
@@ -31,7 +36,10 @@ if ([string]::IsNullOrWhiteSpace($releaseConfirm)) {
         if ([string]::IsNullOrWhiteSpace($commitMessage)) {
             $commitMessage = "feat: update $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         }
-        git commit -m $commitMessage
+        
+        # UTF-8エンコーディングでコミット
+        $env:LC_ALL = "C.UTF-8"
+        git -c core.quotepath=false commit -m $commitMessage
         Write-Host "✅ Changes committed" -ForegroundColor Green
     } catch {
         Write-Host "⚠️  No changes to commit or commit failed" -ForegroundColor Yellow
@@ -58,7 +66,7 @@ if ($releaseConfirm -eq "y" -or $releaseConfirm -eq "yes") {
 Write-Host "✅ Release confirmed, proceeding..." -ForegroundColor Green
 
 # 最新コミットが既に [release] フラグを持っているかチェック
-$latestCommitMessage = git log -1 --pretty=format:"%s"
+$latestCommitMessage = git -c core.quotepath=false log -1 --pretty=format:"%s"
 if ($latestCommitMessage -match "\[release\]") {
     Write-Host "🏷️  Latest commit already has [release] flag: $latestCommitMessage" -ForegroundColor Cyan
     Write-Host "📤 Proceeding to push for CI auto-tagging" -ForegroundColor Yellow
@@ -71,21 +79,26 @@ if ($latestCommitMessage -match "\[release\]") {
         
         if ($hasChanges) {
             git add .
-            $commitMessage = Read-Host "Enter commit message for new changes (or press Enter for default)"
+            $commitMessage = Read-Host "コミットメッセージを入力してください（Enterでデフォルト）"
             if ([string]::IsNullOrWhiteSpace($commitMessage)) {
-                $commitMessage = "feat: update $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+                $commitMessage = "feat: 日本語更新 $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
             }
-            git commit -m $commitMessage
+            # UTF-8エンコーディングで日本語コミット
+            $env:GIT_COMMITTER_NAME = "${env:USERNAME}"
+            $env:GIT_COMMITTER_EMAIL = "${env:USERNAME}@local"
+            $env:LC_ALL = "C.UTF-8"
+            git -c i18n.commitEncoding=utf-8 -c core.quotepath=false commit -m "$commitMessage"
             Write-Host "✅ New changes committed" -ForegroundColor Green
         }
         
         # 最新コミットのメッセージに [release] フラグを追加
-        $currentMessage = git log -1 --pretty=format:"%s"
+        $currentMessage = git -c core.quotepath=false log -1 --pretty=format:"%s"
         $newMessage = "$currentMessage [release]"
-        
-        git commit --amend -m $newMessage
+        # UTF-8エンコーディングでコミット修正
+        $env:LC_ALL = "C.UTF-8"
+        git -c core.quotepath=false commit --amend -m $newMessage
         Write-Host "✅ Current commit amended with release flag" -ForegroundColor Green
-        Write-Host "📝 Updated message: $newMessage" -ForegroundColor Cyan
+        Write-Host ("📝 Updated message: {0}" -f $newMessage) -ForegroundColor Cyan
         
     } catch {
         Write-Host "⚠️  Failed to amend commit" -ForegroundColor Yellow
