@@ -173,6 +173,9 @@ func (c *ReportLabStylePdfClient) drawApprovalTable() {
 	rowHeight1 := 5.0
 	rowHeight2 := 15.0
 
+	// テーブル用の細い線幅を設定
+	c.pdf.SetLineWidth(0.2)
+
 	// ヘッダー行
 	c.pdf.SetFont("yumin", "", 9)
 	headers := []string{"社　長", "会　計", "所　属"}
@@ -225,6 +228,9 @@ func (c *ReportLabStylePdfClient) drawBasicInfoTable() {
 	startX := 10.0
 	startY := 30.0
 
+	// テーブル用の細い線幅を設定
+	c.pdf.SetLineWidth(0.2)
+
 	// 出発・帰着日（左側）
 	rowHeight := 3.5
 	diffStartY := 3.0
@@ -254,6 +260,9 @@ func (c *ReportLabStylePdfClient) drawBasicInfoTable() {
 func (c *ReportLabStylePdfClient) drawMainDataTable() {
 	startX := 10.0
 	startY := 45.0 // タイトルから85mm下
+
+	// テーブル用の細い線幅を設定
+	c.pdf.SetLineWidth(0.2)
 
 	// 正確な列幅（元の画像に合わせて）
 	colWidths := []float64{10, 17, 40, 30, 15, 15, 15, 25, 23}
@@ -296,6 +305,9 @@ func (c *ReportLabStylePdfClient) drawMainDataTable() {
 func (c *ReportLabStylePdfClient) drawSummaryTable() {
 	startX := 10.0
 	startY := 119.0 // 底辺から18mm上
+
+	// テーブル用の細い線幅を設定
+	c.pdf.SetLineWidth(0.2)
 
 	colWidths := []float64{145, 45} // 備考欄と計欄
 	rowHeight := 19.0

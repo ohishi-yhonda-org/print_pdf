@@ -23,7 +23,7 @@ import (
 )
 
 // Version information (set during build with -ldflags)
-var Version = "dev"
+var Version = "v1.0.2"
 
 // グローバル変数
 var (
