@@ -169,7 +169,7 @@ jobs:
 
         # GitHub API でリリース作成
         try {
-          Write-Host "Creating release via GitHub API..."
+          Write-Host 'Creating release via GitHub API...'
           $headers = @{
             'Authorization' = "token $env:GITHUB_TOKEN"
             'Accept' = 'application/vnd.github.v3+json'
@@ -189,7 +189,7 @@ jobs:
           $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $body
           Write-Host "Release $version created successfully"
         } catch {
-          Write-Host "Failed to create release: $_"
+          Write-Host 'Failed to create release: ' + $_
           exit 1
         }
 
