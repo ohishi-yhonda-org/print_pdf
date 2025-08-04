@@ -130,19 +130,36 @@ jobs:
           Write-Host "Tag version: $version"
         } else {
           # mainブランチの場合、最新タグから次のバージョンを生成
-          $latestTag = git tag --sort=-version:refname | Select-Object -First 1
-          if ($latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
+          try {
+            $gitOutput = & "C:\Program Files\Git\bin\git.exe" tag --sort=-version:refname 2>$null
+            $latestTag = $gitOutput | Select-Object -First 1
+            Write-Host "Latest tag found: $latestTag"
+          } catch {
+            Write-Host "Git command failed, trying alternative path"
+            try {
+              $gitOutput = & git tag --sort=-version:refname 2>$null
+              $latestTag = $gitOutput | Select-Object -First 1
+              Write-Host "Latest tag found: $latestTag"
+            } catch {
+              Write-Host "Git not found, using fallback"
+              $latestTag = $null
+            }
+          }
+          
+          if ($latestTag -and $latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
             $major = [int]$matches[1]
             $minor = [int]$matches[2]
             $patch = [int]$matches[3] + 1
             $date = Get-Date -Format "yyyyMMdd"
             $time = Get-Date -Format "HHmm"
             $version = "v$major.$minor.$patch-dev.$date.$time"
+            Write-Host "Generated incremental version: $version"
           } else {
             # タグが見つからない場合のフォールバック
             $date = Get-Date -Format "yyyyMMdd"
             $time = Get-Date -Format "HHmm"
-            $version = "v1.0.1-dev.$date.$time"
+            $version = "v1.0.14-dev.$date.$time"
+            Write-Host "Using fallback version: $version"
           }
           Write-Host "Development version: $version"
         }
