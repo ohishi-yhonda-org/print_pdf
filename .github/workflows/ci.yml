@@ -116,7 +116,7 @@ jobs:
         Write-Host 'Fetching latest releases via GitHub API...'
         $latestTag = $null
         
-        # GitHub API を使用
+        # Use GitHub API
         try {
           $headers = @{
             'Authorization' = 'token ' + $env:GITHUB_TOKEN
@@ -136,7 +136,7 @@ jobs:
           $latestTag = $null
         }
         
-        # バージョン生成
+        # Generate version
         if ($latestTag -and $latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
           $major = [int]$matches[1]
           $minor = [int]$matches[2]
@@ -157,17 +157,17 @@ jobs:
         $version = '${{ steps.version.outputs.version }}'
         Write-Host ('Creating release: ' + $version)
         
-        # リリース説明文を準備
-        $releaseNotes = '自動生成されたリリース ' + $version + "`n`n"
-        $releaseNotes += "## 🤖 CI自動リリース`n"
-        $releaseNotes += "- テスト/Lint通過後の自動リリース`n"
-        $releaseNotes += "- [release]フラグ付きコミットでトリガー`n`n"
-        $releaseNotes += "## 機能`n"
-        $releaseNotes += "- HTTP API サーバー機能 (ポート8081)`n"
-        $releaseNotes += "- PDF生成機能（日本語フォント対応）`n"
-        $releaseNotes += "- Windowsサービス対応"
+        # Prepare release notes in English to avoid encoding issues
+        $releaseNotes = 'Automated release ' + $version + "`n`n"
+        $releaseNotes += '## 🤖 CI Automated Release' + "`n"
+        $releaseNotes += '- Automated release after tests/lint pass' + "`n"
+        $releaseNotes += '- Triggered by commits with [release] flag' + "`n`n"
+        $releaseNotes += '## Features' + "`n"
+        $releaseNotes += '- HTTP API server (port 8081)' + "`n"
+        $releaseNotes += '- PDF generation with Japanese font support' + "`n"
+        $releaseNotes += '- Windows service support'
 
-        # GitHub API でリリース作成
+        # Create release via GitHub API
         try {
           Write-Host 'Creating release via GitHub API...'
           $headers = @{
@@ -243,7 +243,7 @@ jobs:
         go build -ldflags '-s -w -X main.Version=${{ steps.set_version.outputs.version }}' -trimpath -buildmode=exe -o print_pdf.exe .
         Write-Host 'Optimized build completed'
         
-        # ファイルサイズとハッシュを表示
+        # Display file size and hash
         $fileInfo = Get-Item print_pdf.exe
         Write-Host ('File size: ' + $fileInfo.Length + ' bytes')
         $hash = Get-FileHash print_pdf.exe -Algorithm SHA256
@@ -255,7 +255,7 @@ jobs:
         $zipName = 'print_pdf_${{ steps.set_version.outputs.version }}.zip'
         Compress-Archive -Path print_pdf.exe, service_manager.bat -DestinationPath $zipName
         
-        # ZIPファイルの情報も表示
+        # Display ZIP file information
         $zipInfo = Get-Item $zipName
         Write-Host ('ZIP file size: ' + $zipInfo.Length + ' bytes')
     
