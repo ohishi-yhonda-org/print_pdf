@@ -104,33 +104,42 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 全履歴を取得してタグ情報にアクセス
+        fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Setup GitHub CLI
+    - name: Setup environment
       shell: powershell
       run: |
-        # GitHub CLI の確認
-        Write-Host "Checking GitHub CLI installation..."
+        Write-Host "Setting up GitHub CLI environment..."
+        $env:GH_TOKEN = "${{ secrets.GITHUB_TOKEN }}"
+        
+        # GitHub CLI確認
         try {
-          $ghVersion = & gh --version
-          Write-Host "GitHub CLI found: $ghVersion"
+          $ghVersion = gh --version
+          Write-Host "GitHub CLI version: $ghVersion"
         } catch {
-          Write-Host "GitHub CLI not found, attempting to install..."
-          # GitHub CLIがない場合のフォールバック
-          Write-Host "Please ensure GitHub CLI is installed on the runner"
+          Write-Host "Error: GitHub CLI not found"
           exit 1
         }
     
-    - name: Generate next version
+    - name: Generate next version using GitHub CLI
       id: version
       shell: powershell
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # GitHub CLIを使用してリリースタグを取得
+        Write-Host "Fetching latest releases with GitHub CLI..."
+        
         try {
-          $releaseOutput = & gh release list --limit 50 --json tagName 2>$null | ConvertFrom-Json
-          $latestTag = $releaseOutput | Where-Object { $_.tagName -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1 | Select-Object -ExpandProperty tagName
-          Write-Host "Latest release tag: $latestTag"
+          # GitHub CLIで最新リリースを取得
+          $releases = gh release list --limit 10 --json tagName | ConvertFrom-Json
+          $latestTag = $releases | Where-Object { $_.tagName -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1 | Select-Object -ExpandProperty tagName
+          
+          if ($latestTag) {
+            Write-Host "Latest release tag found: $latestTag"
+          } else {
+            Write-Host "No release tags found"
+          }
         } catch {
           Write-Host "GitHub CLI command failed, using fallback"
           $latestTag = $null
