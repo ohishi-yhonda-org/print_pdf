@@ -1,6 +1,6 @@
-﻿# Quick Release Script
-# Usage: .\quick-release.ps1 [version]
-# Example: .\quick-release.ps1 v1.0.15
+﻿# クイックリリーススクリプト
+# 使用方法: .\quick-release.ps1 [version]
+# 例: .\quick-release.ps1 v1.0.15
 
 param(
     [string]$Version = ""
