@@ -256,6 +256,92 @@ type Ryohi struct {
 4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
 5. プルリクエストを作成
 
+## リリース手順
+
+### 自動リリース（推奨）
+
+mainブランチにpushすると、GitHub Actionsが自動的にリリースを作成します：
+
+1. **開発とテスト**
+   ```bash
+   # 開発環境での動作確認
+   go run .
+   # テスト実行
+   go test -v ./...
+   ```
+
+2. **コミットとプッシュ**
+   ```bash
+   git add .
+   git commit -m "機能追加: 新しい機能の説明"
+   git push origin main
+   ```
+
+3. **自動リリース作成**
+   - CIが最新のGitタグから次のバージョンを自動生成
+   - 例：`v1.0.11` → `v1.0.12`
+   - `print_pdf_vX.X.X.zip`が自動作成されます
+
+### 手動リリース
+
+特定のバージョンでリリースしたい場合：
+
+1. **GitHub Actionsの手動実行**
+   - リポジトリのActionsタブに移動
+   - "CI"ワークフローを選択
+   - "Run workflow"をクリック
+   - パラメータを設定：
+     - `create_release`: `true`
+     - `version`: `v1.2.0`（任意のバージョン）
+
+2. **直接タグ作成**
+   ```bash
+   git tag v1.2.0
+   git push origin v1.2.0
+   ```
+
+### リリース内容
+
+自動作成されるリリースには以下が含まれます：
+
+- **バイナリファイル**: `print_pdf.exe`
+- **サービス管理スクリプト**: `service_manager.bat`
+- **ZIPアーカイブ**: `print_pdf_vX.X.X.zip`
+- **自動生成されるリリースノート**：
+  - セキュリティ最適化情報
+  - API エンドポイント一覧
+  - インストール手順
+  - ウイルス対策ソフト対応ガイド
+
+### 開発版の扱い
+
+- **開発版タグ**: `v1.0.X-dev.YYYYMMDD.HHMM`形式のタグは自動削除される場合があります
+- **dev版はリリース作成されません**: コードの`Version = "dev"`の場合、GitHub Releasesは作成されません
+- **本番用ビルド**: CIが`-ldflags`でバージョンを自動設定します
+
+### バージョニング規則
+
+- **メジャーバージョン**: 破壊的変更
+- **マイナーバージョン**: 新機能追加
+- **パッチバージョン**: バグフィックス
+- **開発版サフィックス**: `-dev.YYYYMMDD.HHMM`
+
+### トラブルシューティング
+
+**リリースが作成されない場合：**
+1. CIログを確認
+2. `-dev.`がバージョンに含まれていないか確認
+3. GitHub Actionsの権限を確認
+
+**古いdev版タグの削除：**
+```bash
+# ローカルのdevタグ削除
+git tag -d v1.0.X-dev.YYYYMMDD.HHMM
+
+# リモートのdevタグ削除
+git push origin --delete v1.0.X-dev.YYYYMMDD.HHMM
+```
+
 ## サポート
 
 問題や質問がある場合は、GitHubのIssuesページで報告してください。
