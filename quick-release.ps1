@@ -63,38 +63,42 @@ if ($latestCommitMessage -match "\[release\]") {
     Write-Host "🏷️  Latest commit already has [release] flag: $latestCommitMessage" -ForegroundColor Cyan
     Write-Host "📤 Proceeding to push for CI auto-tagging" -ForegroundColor Yellow
 } else {
-    # Step 1: Add release flag to trigger CI auto-tagging
-    Write-Host "📝 Adding release flag to trigger CI..." -ForegroundColor Yellow
+    # Step 1: Add release flag to existing commit
+    Write-Host "📝 Adding release flag to current commit..." -ForegroundColor Yellow
     try {
-        # 変更がある場合はコミット、ない場合は空コミットで [release] フラグを追加
+        # 変更がある場合は先にコミット
         $hasChanges = (git status --porcelain) -ne $null
         
         if ($hasChanges) {
             git add .
-            $commitMessage = Read-Host "Enter commit message (or press Enter for default)"
+            $commitMessage = Read-Host "Enter commit message for new changes (or press Enter for default)"
             if ([string]::IsNullOrWhiteSpace($commitMessage)) {
-                $commitMessage = "feat: release update $(Get-Date -Format 'yyyy-MM-dd HH:mm') [release]"
-            } else {
-                $commitMessage = "$commitMessage [release]"
+                $commitMessage = "feat: update $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
             }
             git commit -m $commitMessage
-            Write-Host "✅ Changes committed with release flag" -ForegroundColor Green
-        } else {
-            # 変更がない場合は空コミットでリリーストリガー
-            git commit --allow-empty -m "trigger: release $(Get-Date -Format 'yyyy-MM-dd HH:mm') [release]"
-            Write-Host "✅ Empty commit created with release flag" -ForegroundColor Green
+            Write-Host "✅ New changes committed" -ForegroundColor Green
         }
+        
+        # 最新コミットのメッセージに [release] フラグを追加
+        $currentMessage = git log -1 --pretty=format:"%s"
+        $newMessage = "$currentMessage [release]"
+        
+        git commit --amend -m $newMessage
+        Write-Host "✅ Current commit amended with release flag" -ForegroundColor Green
+        Write-Host "📝 Updated message: $newMessage" -ForegroundColor Cyan
+        
     } catch {
-        Write-Host "⚠️  Failed to create release commit" -ForegroundColor Yellow
+        Write-Host "⚠️  Failed to amend commit" -ForegroundColor Yellow
         exit 1
     }
 }
 
-# Step 2: Push changes and trigger CI auto-tagging
-Write-Host "🚀 Pushing changes to main..." -ForegroundColor Yellow
+# Step 2: Push amended commit and trigger CI auto-tagging
+Write-Host "🚀 Pushing amended commit to main..." -ForegroundColor Yellow
+Write-Host "⚠️  Force push required due to commit amendment" -ForegroundColor Yellow
 
-# Push changes to main to trigger auto-tagging
-git push origin main
+# Force push the amended commit to main
+git push --force-with-lease origin main
 
 Write-Host "✅ Changes pushed to main" -ForegroundColor Green
 Write-Host "🤖 CI will automatically create release tag after tests pass" -ForegroundColor Cyan
