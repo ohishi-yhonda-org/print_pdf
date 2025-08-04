@@ -303,13 +303,17 @@ func generatePDFHandler(w http.ResponseWriter, r *http.Request) {
 		// 印刷処理（リクエストされた場合）
 		var printMessage string
 		if shouldPrint {
-			writeEventLog("INFO", "PDF印刷を開始")
+			actualPrinterName := printerName
+			if actualPrinterName == "" {
+				actualPrinterName = "デフォルトプリンター"
+			}
+			writeEventLog("INFO", fmt.Sprintf("PDF印刷を開始: %s", actualPrinterName))
 			pdfPath := "travel_expense_reportlab_style.pdf"
 			if err := PrintPDFWithSumatra(pdfPath, printerName); err != nil {
 				writeEventLog("ERROR", fmt.Sprintf("印刷エラー: %v", err))
 				printMessage = fmt.Sprintf("PDF生成成功、印刷エラー: %v", err)
 			} else {
-				writeEventLog("INFO", "PDF印刷完了")
+				writeEventLog("INFO", fmt.Sprintf("PDF印刷完了: %s", actualPrinterName))
 				printMessage = "PDF generated and printed successfully"
 			}
 		} else {
@@ -410,7 +414,11 @@ func printPDFHandler(w http.ResponseWriter, r *http.Request) {
 		writeEventLog("INFO", "ReportLabスタイルPDF生成完了")
 
 		// 印刷処理
-		writeEventLog("INFO", "PDF印刷を開始")
+		actualPrinterName := printerName
+		if actualPrinterName == "" {
+			actualPrinterName = "デフォルトプリンター"
+		}
+		writeEventLog("INFO", fmt.Sprintf("PDF印刷を開始: %s", actualPrinterName))
 		pdfPath := "travel_expense_reportlab_style.pdf"
 		var printMessage string
 		if err := PrintPDFWithSumatra(pdfPath, printerName); err != nil {
@@ -428,7 +436,7 @@ func printPDFHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(response)
 		} else {
-			writeEventLog("INFO", "PDF印刷完了")
+			writeEventLog("INFO", fmt.Sprintf("PDF印刷完了: %s", actualPrinterName))
 			printMessage = "PDF generated and printed successfully"
 
 			// 成功レスポンス
@@ -541,7 +549,11 @@ func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
 	writeEventLog("INFO", fmt.Sprintf("一時ファイル保存完了: %s", tempFilePath))
 
 	// PDF印刷を実行
-	writeEventLog("INFO", fmt.Sprintf("封筒印刷を開始: %s -> %s", tempFilePath, printerName))
+	actualPrinterName := printerName
+	if actualPrinterName == "" {
+		actualPrinterName = "デフォルトプリンター"
+	}
+	writeEventLog("INFO", fmt.Sprintf("封筒印刷を開始: %s -> %s", tempFilePath, actualPrinterName))
 	err = PrintPDFWithSumatra(tempFilePath, printerName)
 
 	// 一時ファイルを削除（印刷後、少し待ってから）
@@ -585,7 +597,7 @@ func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeEventLog("INFO", "封筒印刷完了")
+	writeEventLog("INFO", fmt.Sprintf("封筒印刷完了: %s", actualPrinterName))
 
 	// 成功レスポンス
 	response := map[string]interface{}{
