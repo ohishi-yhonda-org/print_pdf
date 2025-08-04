@@ -76,12 +76,16 @@ func startHTTPServer() {
 	writeEventLog("INFO", fmt.Sprintf("バージョン: %s", Version))
 	writeEventLog("INFO", "Windowsフォント対応")
 
-	// 起動時に自動アップデートをチェック
-	go func() {
-		// 少し待ってから実行（サーバー起動後）
-		time.Sleep(5 * time.Second)
-		checkForUpdates()
-	}()
+	// 起動時に自動アップデートをチェック（dev環境では無効）
+	if Version != "dev" {
+		go func() {
+			// 少し待ってから実行（サーバー起動後）
+			time.Sleep(5 * time.Second)
+			checkForUpdates()
+		}()
+	} else {
+		writeEventLog("INFO", "開発環境のため自動アップデートを無効にしています")
+	}
 
 	// HTTPルートの設定
 	http.HandleFunc("/generate-pdf", generatePDFHandler)
@@ -303,6 +307,12 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 // 自動アップデート機能
 func checkForUpdates() {
+	// dev環境では自動アップデートを実行しない
+	if Version == "dev" {
+		writeEventLog("INFO", "開発環境のため自動アップデートをスキップします")
+		return
+	}
+
 	writeEventLog("INFO", fmt.Sprintf("現在のバージョン: %s", Version))
 	writeEventLog("INFO", "GitHubリリースの最新バージョンをチェック中...")
 
