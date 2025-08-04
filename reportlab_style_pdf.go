@@ -30,6 +30,9 @@ func NewReportLabStylePdfClient(data []Item) *ReportLabStylePdfClient {
 
 	// A5横向きでPDFを初期化 (210mm x 148mm)
 	pdf := gofpdf.New("L", "mm", "A5", "")
+	
+	// gofpdfはNew()時にページを自動生成しないが、
+	// 描画処理で暗黙的にページが追加される場合がある
 
 	client := &ReportLabStylePdfClient{
 		pdf:       pdf,
@@ -61,16 +64,25 @@ func NewReportLabStylePdfClient(data []Item) *ReportLabStylePdfClient {
 	filePath := "travel_expense_reportlab_style.pdf"
 	fmt.Println("ReportLab Style output file:", filePath)
 
+	// アイテム数に基づいてページを明示的に制御
+	expectedPages := len(data)
+	
 	// 各アイテムを処理
 	for index, item := range data {
-		if index != 0 {
-			pdf.AddPage()
-		}
 		pdf.AddPage()
-		fmt.Printf("Processing ReportLab Style index: %d\n", index)
+		fmt.Printf("Processing item %d/%d (Page: %d)\n", index+1, len(data), pdf.PageNo())
 
 		client.drawLine()
 		client.printItem(item)
+	}
+	
+	// 期待ページ数と実際のページ数を比較
+	actualPages := pdf.PageNo()
+	fmt.Printf("Expected pages: %d, Actual pages: %d\n", expectedPages, actualPages)
+	
+	// 余分なページがある場合の警告（デバッグ用）
+	if actualPages != expectedPages {
+		fmt.Printf("警告: 期待ページ数(%d)と実際のページ数(%d)が一致しません\n", expectedPages, actualPages)
 	}
 
 	// PDFを保存
