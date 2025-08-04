@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(powershell:*)",
-      "Bash(move quick-release-fixed.ps1 quick-release.ps1)"
+      "Bash(move quick-release-fixed.ps1 quick-release.ps1)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
