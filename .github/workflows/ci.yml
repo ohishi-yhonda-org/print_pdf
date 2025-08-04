@@ -96,6 +96,50 @@ jobs:
       continue-on-error: true
       run: golangci-lint run ./...
 
+  auto_tag:
+    runs-on: [self-hosted, Windows, X64, test]
+    needs: [test, lint]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(github.event.head_commit.message, '[release]')
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 全履歴を取得してタグ情報にアクセス
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Generate next version
+      id: version
+      shell: powershell
+      run: |
+        # 最新のリリースタグを取得
+        $latestTag = git tag --sort=-version:refname | Where-Object { $_ -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1
+        
+        if ($latestTag -and $latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
+          $major = [int]$matches[1]
+          $minor = [int]$matches[2]
+          $patch = [int]$matches[3] + 1
+          $newVersion = "v$major.$minor.$patch"
+        } else {
+          $newVersion = "v1.0.0"
+        }
+        
+        Write-Host "Generated version: $newVersion"
+        echo "version=$newVersion" >> $env:GITHUB_OUTPUT
+    
+    - name: Create and push tag
+      shell: powershell
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        Write-Host "Creating tag: $version"
+        
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git tag $version
+        git push origin $version
+        
+        Write-Host "Tag $version created and pushed"
+
   release:
     runs-on: [self-hosted, Windows, X64, test]
     # Skip test/lint dependencies for tag-based releases (assume they passed on main)
