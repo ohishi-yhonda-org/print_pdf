@@ -30,12 +30,7 @@ if %errorlevel% equ 0 (
     echo ⚠️  No changes to commit or commit failed
 )
 
-:: Step 2: Push changes
-echo.
-echo 📤 Pushing changes to main...
-git push origin main
-
-:: Step 3: Generate and push release tag
+:: Step 2: Generate and push release tag
 echo.
 if "%VERSION%"=="" (
     echo 🔄 Generating next release version...
@@ -63,13 +58,14 @@ if "%VERSION%"=="" (
     echo Using specified version: %VERSION%
 )
 
-echo 🚀 Creating release tag: %VERSION%
+echo 🚀 Creating release tag and pushing: %VERSION%
 
-:: Create and push tag for release (non-dev version)
+:: Push main branch and create tag in one operation
+git push origin main
 git tag %VERSION%
 git push origin %VERSION%
 
-echo ✅ Release tag %VERSION% created and pushed
+echo ✅ Changes and release tag %VERSION% pushed
 
 :: Step 4: Open GitHub Actions page
 echo.

@@ -22,11 +22,7 @@ try {
     Write-Host "⚠️  No changes to commit or commit failed" -ForegroundColor Yellow
 }
 
-# Step 2: Push changes
-Write-Host "📤 Pushing changes to main..." -ForegroundColor Yellow
-git push origin main
-
-# Step 3: Generate and push release tag
+# Step 2: Generate and push release tag
 if ([string]::IsNullOrWhiteSpace($Version)) {
     Write-Host "🔄 Generating next release version..." -ForegroundColor Yellow
     
@@ -62,13 +58,14 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
     Write-Host "Using specified version: $Version" -ForegroundColor Cyan
 }
 
-Write-Host "🚀 Creating release tag: $Version" -ForegroundColor Yellow
+Write-Host "🚀 Creating release tag and pushing: $Version" -ForegroundColor Yellow
 
-# Create and push tag for release (non-dev version)
+# Push main branch and create tag in one operation
+git push origin main
 git tag $Version
 git push origin $Version
 
-Write-Host "✅ Release tag $Version created and pushed" -ForegroundColor Green
+Write-Host "✅ Changes and release tag $Version pushed" -ForegroundColor Green
 
 # Step 4: Open GitHub Actions page
 Write-Host "🌐 Opening GitHub Actions page..." -ForegroundColor Yellow
