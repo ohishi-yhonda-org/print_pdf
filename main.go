@@ -23,7 +23,7 @@ import (
 )
 
 // Version information (set during build with -ldflags)
-var Version = "v1.0.2"
+var Version = "dev"
 
 // グローバル変数
 var (
@@ -44,30 +44,28 @@ func (m *service) Execute(args []string, r <-chan svc.ChangeRequest, changes cha
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	// サービス制御メッセージを待機
-	for {
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				changes <- c.CurrentStatus
-			case svc.Stop, svc.Shutdown:
-				writeEventLog("INFO", "サービス停止要求を受信")
-				if httpServer != nil {
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-					defer cancel()
-					httpServer.Shutdown(ctx)
-				}
-				changes <- svc.Status{State: svc.StopPending}
-				return
-			case svc.Pause:
-				changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
-			case svc.Continue:
-				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-			default:
-				elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
+	for c := range r {
+		switch c.Cmd {
+		case svc.Interrogate:
+			changes <- c.CurrentStatus
+		case svc.Stop, svc.Shutdown:
+			writeEventLog("INFO", "サービス停止要求を受信")
+			if httpServer != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				httpServer.Shutdown(ctx)
 			}
+			changes <- svc.Status{State: svc.StopPending}
+			return
+		case svc.Pause:
+			changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
+		case svc.Continue:
+			changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+		default:
+			elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
 		}
 	}
+	return
 }
 
 // HTTPサーバー起動関数
@@ -505,7 +503,7 @@ func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	writeEventLog("INFO", fmt.Sprintf("受信ファイル: %s, サイズ: %d bytes, プリンター: %s", 
+	writeEventLog("INFO", fmt.Sprintf("受信ファイル: %s, サイズ: %d bytes, プリンター: %s",
 		header.Filename, header.Size, printerName))
 
 	// 一時ファイルとして保存
@@ -544,28 +542,42 @@ func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
 	// PDF印刷を実行
 	writeEventLog("INFO", fmt.Sprintf("封筒印刷を開始: %s -> %s", tempFilePath, printerName))
 	err = PrintPDFWithSumatra(tempFilePath, printerName)
-	
-	// 一時ファイルを削除（印刷後）
+
+	// 一時ファイルを削除（印刷後、少し待ってから）
 	defer func() {
-		if removeErr := os.Remove(tempFilePath); removeErr != nil {
-			writeEventLog("WARN", fmt.Sprintf("一時ファイル削除エラー: %v", removeErr))
-		} else {
-			writeEventLog("INFO", fmt.Sprintf("一時ファイル削除完了: %s", tempFilePath))
+		// 印刷処理が完了するまで少し待つ
+		time.Sleep(3 * time.Second)
+
+		// ファイルが使用中の場合は数回リトライ
+		maxRetries := 5
+		for i := 0; i < maxRetries; i++ {
+			if removeErr := os.Remove(tempFilePath); removeErr != nil {
+				if i < maxRetries-1 {
+					writeEventLog("INFO", fmt.Sprintf("一時ファイル削除リトライ %d/%d: %v", i+1, maxRetries, removeErr))
+					time.Sleep(2 * time.Second)
+					continue
+				} else {
+					writeEventLog("WARN", fmt.Sprintf("一時ファイル削除最終エラー: %v", removeErr))
+				}
+			} else {
+				writeEventLog("INFO", fmt.Sprintf("一時ファイル削除完了: %s", tempFilePath))
+				break
+			}
 		}
 	}()
 
 	if err != nil {
 		writeEventLog("ERROR", fmt.Sprintf("封筒印刷エラー: %v", err))
-		
+
 		// エラーレスポンス
 		response := map[string]interface{}{
-			"status":    "error",
-			"message":   fmt.Sprintf("印刷エラー: %v", err),
-			"filename":  header.Filename,
-			"printer":   printerName,
-			"printed":   false,
+			"status":   "error",
+			"message":  fmt.Sprintf("印刷エラー: %v", err),
+			"filename": header.Filename,
+			"printer":  printerName,
+			"printed":  false,
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
@@ -573,17 +585,17 @@ func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeEventLog("INFO", "封筒印刷完了")
-	
+
 	// 成功レスポンス
 	response := map[string]interface{}{
-		"status":    "success",
-		"message":   "封筒印刷が正常に完了しました",
-		"filename":  header.Filename,
-		"printer":   printerName,
-		"printed":   true,
-		"fileSize":  header.Size,
+		"status":   "success",
+		"message":  "封筒印刷が正常に完了しました",
+		"filename": header.Filename,
+		"printer":  printerName,
+		"printed":  true,
+		"fileSize": header.Size,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
