@@ -213,10 +213,8 @@ jobs:
         $hash = Get-FileHash print_pdf.exe -Algorithm SHA256
         Write-Host ('SHA256: ' + $hash.Hash)
     
-    - name: Create and upload ZIP archive
+    - name: Create ZIP archive
       shell: powershell
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $version = '${{ steps.version.outputs.version }}'
         $zipName = 'print_pdf_' + $version + '.zip'
@@ -228,16 +226,15 @@ jobs:
         # Display ZIP info
         $zipInfo = Get-Item $zipName
         Write-Host ('ZIP file size: ' + $zipInfo.Length + ' bytes')
-        
-        # Upload ZIP to release using GitHub CLI
-        try {
-          Write-Host 'Uploading ZIP archive to release...'
-          gh release upload $version $zipName
-          Write-Host 'ZIP archive uploaded successfully'
-        } catch {
-          Write-Host 'Failed to upload ZIP archive: ' + $_
-          exit 1
-        }
+    
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        files: |
+          print_pdf_${{ steps.version.outputs.version }}.zip
 
   release:
     runs-on: [self-hosted, Windows, X64, test]
