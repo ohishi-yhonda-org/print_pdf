@@ -89,6 +89,7 @@ func startHTTPServer() {
 
 	// HTTPルートの設定
 	http.HandleFunc("/generate-pdf", generatePDFHandler)
+	http.HandleFunc("/print-pdf", printPDFHandler)
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeEventLog("INFO", fmt.Sprintf("ルートアクセス from %s", r.RemoteAddr))
@@ -97,12 +98,23 @@ PDF Generator API Server %s
 
 Available endpoints:
 - POST /generate-pdf : Generate PDF from JSON data
+- POST /print-pdf    : Generate and print PDF
 - GET  /health       : Health check
 
-Example request:
+Example request (generate only):
 curl -X POST http://localhost:8081/generate-pdf \
   -H "Content-Type: application/json" \
   -d '[{"car":"test","name":"テスト","ryohi":[]}]'
+
+Example request (generate and print):
+curl -X POST http://localhost:8081/print-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"car":"test","name":"テスト","ryohi":[]}],"print":true}'
+
+Example request (generate and print to specific printer):
+curl -X POST http://localhost:8081/generate-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"car":"test","name":"テスト","ryohi":[]}],"print":true,"printerName":"Canon Printer"}'
 
 Version: %s
 Platform: %s %s
@@ -113,6 +125,7 @@ Platform: %s %s
 	port := ":8081"
 	writeEventLog("INFO", fmt.Sprintf("HTTPサーバーを起動中... http://localhost%s", port))
 	writeEventLog("INFO", "PDF生成エンドポイント: POST /generate-pdf")
+	writeEventLog("INFO", "PDF印刷エンドポイント: POST /print-pdf")
 	writeEventLog("INFO", "ヘルスチェック: GET /health")
 
 	httpServer = &http.Server{
@@ -250,12 +263,30 @@ func generatePDFHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// JSONをパース
+	// JSONをパース - まずPrintRequestとして試行
+	var printRequest PrintRequest
 	var requestData []Item
-	if err := json.Unmarshal(body, &requestData); err != nil {
-		writeEventLog("ERROR", fmt.Sprintf("JSON パースエラー: %v", err))
-		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
-		return
+	var shouldPrint bool
+	var printerName string
+
+	// PrintRequest形式での解析を試行
+	if err := json.Unmarshal(body, &printRequest); err == nil && len(printRequest.Items) > 0 {
+		// PrintRequest形式の場合
+		requestData = printRequest.Items
+		shouldPrint = printRequest.Print
+		if printRequest.PrinterName != nil {
+			printerName = *printRequest.PrinterName
+		}
+		writeEventLog("INFO", fmt.Sprintf("印刷リクエスト形式で受信: 印刷=%v, プリンター=%s", shouldPrint, printerName))
+	} else {
+		// 従来のItem配列形式の場合
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			writeEventLog("ERROR", fmt.Sprintf("JSON パースエラー: %v", err))
+			http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+			return
+		}
+		shouldPrint = false // デフォルトは印刷しない
+		writeEventLog("INFO", "従来形式で受信（印刷なし）")
 	}
 
 	writeEventLog("INFO", fmt.Sprintf("受信データ: %d件のアイテム", len(requestData)))
@@ -267,11 +298,28 @@ func generatePDFHandler(w http.ResponseWriter, r *http.Request) {
 	if reportlabClient != nil {
 		writeEventLog("INFO", "ReportLabスタイルPDF生成完了")
 
+		// 印刷処理（リクエストされた場合）
+		var printMessage string
+		if shouldPrint {
+			writeEventLog("INFO", "PDF印刷を開始")
+			pdfPath := "travel_expense_reportlab_style.pdf"
+			if err := PrintPDFWithSumatra(pdfPath, printerName); err != nil {
+				writeEventLog("ERROR", fmt.Sprintf("印刷エラー: %v", err))
+				printMessage = fmt.Sprintf("PDF生成成功、印刷エラー: %v", err)
+			} else {
+				writeEventLog("INFO", "PDF印刷完了")
+				printMessage = "PDF generated and printed successfully"
+			}
+		} else {
+			printMessage = "PDF generated successfully"
+		}
+
 		// 成功レスポンス
 		response := map[string]interface{}{
 			"status":  "success",
-			"message": "PDF generated successfully",
+			"message": printMessage,
 			"items":   len(requestData),
+			"printed": shouldPrint,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -303,6 +351,109 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+// HTTPハンドラー: PDF印刷専用エンドポイント
+func printPDFHandler(w http.ResponseWriter, r *http.Request) {
+	// CORSヘッダーを設定
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// OPTIONSリクエストの処理
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// POSTメソッドのみ許可
+	if r.Method != "POST" {
+		writeEventLog("WARN", fmt.Sprintf("不正なメソッドでのアクセス: %s from %s", r.Method, r.RemoteAddr))
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("PDF印刷リクエストを受信 from %s", r.RemoteAddr))
+
+	// リクエストボディを読み取り
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("リクエストボディ読み取りエラー: %v", err))
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// PrintRequest形式でJSONをパース
+	var printRequest PrintRequest
+	if err := json.Unmarshal(body, &printRequest); err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("JSON パースエラー: %v", err))
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	requestData := printRequest.Items
+	printerName := ""
+	if printRequest.PrinterName != nil {
+		printerName = *printRequest.PrinterName
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("印刷リクエスト: %d件のアイテム, プリンター=%s", len(requestData), printerName))
+
+	// PDF生成処理
+	writeEventLog("INFO", "ReportLabスタイルPDF生成を開始")
+	reportlabClient := NewReportLabStylePdfClient(requestData)
+
+	if reportlabClient != nil {
+		writeEventLog("INFO", "ReportLabスタイルPDF生成完了")
+
+		// 印刷処理
+		writeEventLog("INFO", "PDF印刷を開始")
+		pdfPath := "travel_expense_reportlab_style.pdf"
+		var printMessage string
+		if err := PrintPDFWithSumatra(pdfPath, printerName); err != nil {
+			writeEventLog("ERROR", fmt.Sprintf("印刷エラー: %v", err))
+			printMessage = fmt.Sprintf("PDF生成成功、印刷エラー: %v", err)
+			
+			// エラーレスポンス
+			response := map[string]interface{}{
+				"status":  "partial_success",
+				"message": printMessage,
+				"items":   len(requestData),
+				"printed": false,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(response)
+		} else {
+			writeEventLog("INFO", "PDF印刷完了")
+			printMessage = "PDF generated and printed successfully"
+			
+			// 成功レスポンス
+			response := map[string]interface{}{
+				"status":  "success",
+				"message": printMessage,
+				"items":   len(requestData),
+				"printed": true,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(response)
+		}
+	} else {
+		writeEventLog("ERROR", "ReportLabスタイルPDF生成に失敗")
+
+		// エラーレスポンス
+		response := map[string]interface{}{
+			"status":  "error",
+			"message": "Failed to generate PDF",
+			"printed": false,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+	}
 }
 
 // 自動アップデート機能

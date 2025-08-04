@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
@@ -470,4 +472,72 @@ func (c *ReportLabStylePdfClient) printRyohiItems(ryohiList []Ryohi) {
 		fmt.Printf("旅費項目 %d: 最大行数=%d, 実際印刷行数=%d, 現在行=%d\n",
 			i+1, printData.MaxRows, drawnRows, currentRow)
 	}
+}
+
+// PrintPDFWithSumatra - SumatraPDFを使用してPDFを印刷
+func PrintPDFWithSumatra(pdfPath string, printerName string) error {
+	// SumatraPDFの実行ファイルパスを取得
+	sumatraPath, err := getSumatraPDFPath()
+	if err != nil {
+		return fmt.Errorf("SumatraPDF実行ファイルが見つかりません: %v", err)
+	}
+
+	// PDFファイルの絶対パスを取得
+	absPath, err := filepath.Abs(pdfPath)
+	if err != nil {
+		return fmt.Errorf("PDFファイルの絶対パス取得エラー: %v", err)
+	}
+
+	// SumatraPDFコマンドを構築
+	var cmd *exec.Cmd
+	if printerName != "" {
+		// 特定のプリンターに印刷
+		cmd = exec.Command(sumatraPath, "-print-to", printerName, absPath)
+	} else {
+		// デフォルトプリンターに印刷
+		cmd = exec.Command(sumatraPath, "-print-to-default", absPath)
+	}
+
+	fmt.Printf("SumatraPDFで印刷中: %s\n", absPath)
+	if printerName != "" {
+		fmt.Printf("プリンター: %s\n", printerName)
+	} else {
+		fmt.Println("デフォルトプリンターに印刷")
+	}
+
+	// コマンド実行
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("印刷エラー: %v, 出力: %s", err, string(output))
+	}
+
+	fmt.Println("印刷が正常に実行されました")
+	return nil
+}
+
+// getSumatraPDFPath - SumatraPDFの実行ファイルパスを取得
+func getSumatraPDFPath() (string, error) {
+	// 現在のディレクトリでSumatraPDFを探す
+	candidates := []string{
+		"SumatraPDF-3.5.2-64.exe",
+		"SumatraPDF.exe",
+	}
+
+	for _, candidate := range candidates {
+		// 絶対パスに変換
+		absPath, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if _, err := os.Stat(absPath); err == nil {
+			return absPath, nil
+		}
+	}
+
+	// システムPATHでSumatraPDFを探す
+	if path, err := exec.LookPath("SumatraPDF.exe"); err == nil {
+		return path, nil
+	}
+
+	return "", fmt.Errorf("SumatraPDF実行ファイルが見つかりません")
 }
