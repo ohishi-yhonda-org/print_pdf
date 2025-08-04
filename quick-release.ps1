@@ -123,73 +123,18 @@ Start-Sleep -Seconds 5
 Write-Host "🌐 Opening GitHub Actions to monitor tests..." -ForegroundColor Yellow
 Start-Process "https://github.com/ohishi-yhonda-org/print_pdf/actions"
 
-# Ask user to confirm tests passed
-Write-Host ""
-Write-Host "📊 Please check GitHub Actions and confirm:" -ForegroundColor Cyan
-Write-Host "  - Test job: ✅ Passed" -ForegroundColor White
-Write-Host "  - Lint job: ✅ Passed" -ForegroundColor White
-Write-Host ""
+# Create release tag automatically
+Write-Host "🚀 Creating release tag: $Version" -ForegroundColor Yellow
 
-# Ask user to confirm tests passed
-Write-Host ""
-Write-Host "📊 Please check GitHub Actions and confirm:" -ForegroundColor Cyan
-Write-Host "  - Test job: ✅ Passed" -ForegroundColor White
-Write-Host "  - Lint job: ✅ Passed" -ForegroundColor White
-Write-Host ""
-Write-Host "Options:" -ForegroundColor Yellow
-Write-Host "  'yes' or 'y' - Create release tag now" -ForegroundColor White
-Write-Host "  'wait' or 'w' - Wait 30 seconds and ask again" -ForegroundColor White
-Write-Host "  'no' or 'n' - Abort release" -ForegroundColor White
-Write-Host ""
+# Create and push tag for release
+git tag $Version
+git push origin $Version
 
-do {
-    $confirmation = Read-Host "Your choice"
-    
-    if ($confirmation -eq "wait" -or $confirmation -eq "w") {
-        Write-Host "⏳ Waiting 30 seconds for CI to complete..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 30
-        Write-Host "🔍 Please check GitHub Actions again..." -ForegroundColor Cyan
-        continue
-    }
-    
-    if ($confirmation -eq "yes" -or $confirmation -eq "y") {
-        Write-Host "🚀 Creating release tag: $Version" -ForegroundColor Yellow
-        
-        # Create and push tag for release
-        git tag $Version
-        git push origin $Version
-        
-        Write-Host "✅ Release tag $Version created and pushed" -ForegroundColor Green
-        
-        Write-Host ""
-        Write-Host "🎉 Release process initiated!" -ForegroundColor Green
-        Write-Host "📦 Release will be available in 2-3 minutes (no duplicate testing)" -ForegroundColor Cyan
-        break
-    }
-    
-    if ($confirmation -eq "no" -or $confirmation -eq "n") {
-        Write-Host "❌ Release aborted by user" -ForegroundColor Red
-        Write-Host "Fix any test failures and run the script again" -ForegroundColor Yellow
-        break
-    }
-    
-    Write-Host "Please enter 'yes', 'wait', or 'no'" -ForegroundColor Red
-    
-} while ($true)
-
-# Step 4: Open GitHub Actions page
-Write-Host "🌐 Opening GitHub Actions page..." -ForegroundColor Yellow
-Start-Process "https://github.com/ohishi-yhonda-org/print_pdf/actions"
+Write-Host "✅ Release tag $Version created and pushed" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "🎉 Release process initiated!" -ForegroundColor Green
-Write-Host "📊 Check the Actions tab to monitor progress" -ForegroundColor Cyan
-Write-Host "📦 Release will be available in 2-5 minutes" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Wait for CI to complete" -ForegroundColor White
-Write-Host "  2. Check GitHub Releases page" -ForegroundColor White
-Write-Host "  3. Download and test the new release" -ForegroundColor White
+Write-Host "🎉 Release process completed!" -ForegroundColor Green
+Write-Host "📦 Release will be available in 2-3 minutes" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "💡 Future usage:" -ForegroundColor Gray
 Write-Host "   Enter = push only | y = full release | n = cancel" -ForegroundColor Gray
