@@ -4,7 +4,9 @@
       "Bash(powershell:*)",
       "Bash(move quick-release-fixed.ps1 quick-release.ps1)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh workflow:*)"
     ],
     "deny": []
   }
