@@ -8,6 +8,55 @@ param(
 
 Write-Host "🚀 Quick Release Script Starting..." -ForegroundColor Green
 
+# Step 0: Confirm release intention
+Write-Host ""
+Write-Host "📋 Release Confirmation" -ForegroundColor Cyan
+Write-Host "This script will:" -ForegroundColor White
+Write-Host "  Default (Enter): Just commit & push changes" -ForegroundColor Green
+Write-Host "  'y': Full release workflow with CI" -ForegroundColor White
+Write-Host "  'n': Cancel" -ForegroundColor White
+Write-Host ""
+
+$releaseConfirm = Read-Host "Action? (Enter=push only, y=release, n=cancel)"
+
+# Default to push-only if Enter pressed
+if ([string]::IsNullOrWhiteSpace($releaseConfirm)) {
+    Write-Host "📝 Push-only mode (default)" -ForegroundColor Yellow
+    
+    # Step 1: Commit current changes
+    Write-Host "📝 Committing current changes..." -ForegroundColor Yellow
+    try {
+        git add .
+        $commitMessage = Read-Host "Enter commit message (or press Enter for default)"
+        if ([string]::IsNullOrWhiteSpace($commitMessage)) {
+            $commitMessage = "feat: update $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+        }
+        git commit -m $commitMessage
+        Write-Host "✅ Changes committed" -ForegroundColor Green
+    } catch {
+        Write-Host "⚠️  No changes to commit or commit failed" -ForegroundColor Yellow
+    }
+    
+    # Push to main
+    git push origin main
+    Write-Host "✅ Changes pushed to main" -ForegroundColor Green
+    Write-Host "🎯 Push-only complete. No release created." -ForegroundColor Cyan
+    exit
+}
+
+if ($releaseConfirm -eq "y" -or $releaseConfirm -eq "yes") {
+    Write-Host "🚀 Full release mode selected" -ForegroundColor Green
+    # Continue to full release workflow below
+} elseif ($releaseConfirm -eq "n" -or $releaseConfirm -eq "no") {
+    Write-Host "❌ Cancelled by user" -ForegroundColor Red
+    exit
+} else {
+    Write-Host "❌ Invalid option. Use: Enter (push only), y (release), n (cancel)" -ForegroundColor Red
+    exit
+}
+
+Write-Host "✅ Release confirmed, proceeding..." -ForegroundColor Green
+
 # Step 1: Commit current changes
 Write-Host "📝 Committing current changes..." -ForegroundColor Yellow
 try {
@@ -141,3 +190,6 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Wait for CI to complete" -ForegroundColor White
 Write-Host "  2. Check GitHub Releases page" -ForegroundColor White
 Write-Host "  3. Download and test the new release" -ForegroundColor White
+Write-Host ""
+Write-Host "💡 Future usage:" -ForegroundColor Gray
+Write-Host "   Enter = push only | y = full release | n = cancel" -ForegroundColor Gray
