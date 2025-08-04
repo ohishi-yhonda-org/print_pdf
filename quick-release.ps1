@@ -99,10 +99,6 @@ if ($latestCommitMessage -match "\[release\]") {
         git -c core.quotepath=false commit --amend -m $newMessage
         Write-Host "✅ Current commit amended with release flag" -ForegroundColor Green
         Write-Host ("📝 Updated message: {0}" -f $newMessage) -ForegroundColor Cyan
-        
-    } catch {
-        Write-Host "⚠️  Failed to amend commit" -ForegroundColor Yellow
-        exit 1
     }
 }
 
@@ -123,9 +119,9 @@ Start-Sleep -Seconds 5
 Write-Host "🌐 Opening GitHub Actions to monitor progress..." -ForegroundColor Yellow
 Start-Process "https://github.com/ohishi-yhonda-org/print_pdf/actions"
 
-Write-Host ""
+Write-Host "" 
 Write-Host "🎉 Release process initiated!" -ForegroundColor Green
 Write-Host "📦 Release will be created automatically by CI" -ForegroundColor Cyan
-Write-Host ""
+Write-Host "" 
 Write-Host "💡 Future usage:" -ForegroundColor Gray
 Write-Host "   Enter = push only | y = full release | n = cancel" -ForegroundColor Gray
