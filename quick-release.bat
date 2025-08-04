@@ -58,14 +58,43 @@ if "%VERSION%"=="" (
     echo Using specified version: %VERSION%
 )
 
-echo 🚀 Pushing changes and creating release tag: %VERSION%
+echo 🚀 Pushing changes to main for testing...
 
-:: Push changes to main first, then create and push tag  
+:: First push changes to main to run tests
 git push origin main
-git tag %VERSION%
-git push origin %VERSION%
 
-echo ✅ Changes pushed and release tag %VERSION% created
+echo ✅ Changes pushed to main
+echo ⏳ Waiting for CI tests to complete...
+
+:: Wait a moment for CI to start
+timeout /t 5 /nobreak > nul
+
+:: Open GitHub Actions to monitor progress
+echo 🌐 Opening GitHub Actions to monitor tests...
+start https://github.com/ohishi-yhonda-org/print_pdf/actions
+
+echo.
+echo 📊 Please check GitHub Actions and confirm:
+echo   - Test job: ✅ Passed
+echo   - Lint job: ✅ Passed
+echo.
+
+set /p "CONFIRMATION=Are tests passing? Type 'yes' to create release tag, or 'no' to abort: "
+
+if /i "%CONFIRMATION%"=="yes" (
+    echo 🚀 Creating release tag: %VERSION%
+    
+    git tag %VERSION%
+    git push origin %VERSION%
+    
+    echo ✅ Release tag %VERSION% created and pushed
+    echo.
+    echo 🎉 Release process initiated!
+    echo 📦 Release will be available in 2-3 minutes ^(no duplicate testing^)
+) else (
+    echo ❌ Release aborted by user
+    echo Fix any test failures and run the script again
+)
 
 :: Step 4: Open GitHub Actions page
 echo.

@@ -98,8 +98,8 @@ jobs:
 
   release:
     runs-on: [self-hosted, Windows, X64, test]
-    needs: [test, lint]
-    if: (github.event.inputs.create_release == 'true') || (startsWith(github.ref, 'refs/tags/v'))
+    # Skip test/lint dependencies for tag-based releases (assume they passed on main)
+    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
     - uses: actions/checkout@v4
