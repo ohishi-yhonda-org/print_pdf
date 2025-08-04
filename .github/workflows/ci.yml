@@ -107,107 +107,33 @@ jobs:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Setup GitHub CLI
-      shell: powershell
-      run: |
-        Write-Host "Checking GitHub CLI availability..."
-        
-        # GitHub CLIが既にインストールされているかチェック
-        try {
-          $ghVersion = gh --version
-          Write-Host "GitHub CLI already available: $ghVersion"
-        } catch {
-          Write-Host "GitHub CLI not found, installing via direct download..."
-          
-          try {
-            # 直接ダウンロードしてインストール
-            $ghUrl = "https://github.com/cli/cli/releases/latest/download/gh_2.40.1_windows_amd64.msi"
-            $ghMsi = "$env:TEMP\gh.msi"
-            Invoke-WebRequest -Uri $ghUrl -OutFile $ghMsi
-            Start-Process msiexec.exe -ArgumentList "/i", $ghMsi, "/quiet", "/norestart" -Wait
-            Remove-Item $ghMsi -Force
-            
-            # PATHを更新
-            $env:PATH = "$env:PATH;C:\Program Files\GitHub CLI"
-            Write-Host "GitHub CLI installed via direct download"
-            
-            # インストール後の確認
-            $ghVersion = gh --version
-            Write-Host "GitHub CLI installation verified: $ghVersion"
-            
-          } catch {
-            Write-Host "Failed to install GitHub CLI: $_"
-            Write-Host "Falling back to API-only approach"
-            # フォールバック処理は後続のステップで実装
-          }
-        }
-    
-    - name: Verify GitHub CLI installation
-      id: verify
-      shell: powershell
-      run: |
-        Write-Host "Setting up GitHub CLI environment..."
-        $env:GH_TOKEN = "${{ secrets.GITHUB_TOKEN }}"
-        
-        # GitHub CLI確認（フォールバック可能）
-        try {
-          $ghVersion = gh --version
-          Write-Host "GitHub CLI version: $ghVersion"
-          echo "github_cli_available=true" >> $env:GITHUB_OUTPUT
-        } catch {
-          Write-Host "Warning: GitHub CLI not available, will use API fallback"
-          echo "github_cli_available=false" >> $env:GITHUB_OUTPUT
-        }
-    
-    - name: Generate next version using GitHub CLI or API
+    - name: Generate next version using GitHub API
       id: version
       shell: powershell
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        Write-Host "Fetching latest releases..."
+        Write-Host "Fetching latest releases via GitHub API..."
         $latestTag = $null
         
-        # GitHub CLIが利用可能な場合は優先使用
-        if ("${{ steps.verify.outputs.github_cli_available }}" -eq "true") {
-          try {
-            Write-Host "Using GitHub CLI to fetch releases..."
-            $releases = gh release list --limit 10 --json tagName | ConvertFrom-Json
-            $latestTag = $releases | Where-Object { $_.tagName -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1 | Select-Object -ExpandProperty tagName
-            
-            if ($latestTag) {
-              Write-Host "Latest release tag found via GitHub CLI: $latestTag"
-            } else {
-              Write-Host "No valid release tags found via GitHub CLI"
-            }
-          } catch {
-            Write-Host "GitHub CLI failed: $_"
-            $latestTag = $null
+        # GitHub API を使用
+        try {
+          $headers = @{
+            'Authorization' = "token $env:GITHUB_TOKEN"
+            'Accept' = 'application/vnd.github.v3+json'
           }
-        }
-        
-        # GitHub CLIが失敗した場合はAPI使用
-        if (-not $latestTag) {
-          try {
-            Write-Host "Using GitHub API to fetch releases..."
-            $headers = @{
-              'Authorization' = "token $env:GITHUB_TOKEN"
-              'Accept' = 'application/vnd.github.v3+json'
-            }
-            $apiUrl = "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10"
-            $response = Invoke-RestMethod -Uri $apiUrl -Headers $headers
-            $latestTag = $response | Where-Object { $_.tag_name -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1 | Select-Object -ExpandProperty tag_name
-            
-            if ($latestTag) {
-              Write-Host "Latest release tag found via API: $latestTag"
-            } else {
-              Write-Host "No valid release tags found via API"
-            }
-          } catch {
-            Write-Host "GitHub API also failed: $_"
-            $latestTag = $null
+          $apiUrl = "https://api.github.com/repos/${{ github.repository }}/releases?per_page=10"
+          $response = Invoke-RestMethod -Uri $apiUrl -Headers $headers
+          $latestTag = $response | Where-Object { $_.tag_name -match "^v\d+\.\d+\.\d+$" } | Select-Object -First 1 | Select-Object -ExpandProperty tag_name
+          
+          if ($latestTag) {
+            Write-Host "Latest release tag found: $latestTag"
+          } else {
+            Write-Host "No valid release tags found"
           }
+        } catch {
+          Write-Host "GitHub API failed: $_"
+          $latestTag = $null
         }
         
         # バージョン生成
@@ -223,10 +149,9 @@ jobs:
         Write-Host "Generated version: $newVersion"
         echo "version=$newVersion" >> $env:GITHUB_OUTPUT
     
-    - name: Create release with GitHub CLI or API
+    - name: Create release with GitHub API
       shell: powershell
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $version = "${{ steps.version.outputs.version }}"
@@ -242,21 +167,9 @@ jobs:
         $releaseNotes += "- PDF生成機能（日本語フォント対応）`n"
         $releaseNotes += "- Windowsサービス対応"
 
-        # GitHub CLIが利用可能な場合は優先使用
-        if ("${{ steps.verify.outputs.github_cli_available }}" -eq "true") {
-          try {
-            Write-Host "Using GitHub CLI to create release..."
-            gh release create $version --title "PDF Generator $version" --notes $releaseNotes --latest
-            Write-Host "Release $version created successfully via GitHub CLI"
-            exit 0
-          } catch {
-            Write-Host "GitHub CLI failed: $_"
-          }
-        }
-        
-        # GitHub CLIが失敗した場合はAPI使用
-        Write-Host "Using GitHub API to create release..."
+        # GitHub API でリリース作成
         try {
+          Write-Host "Creating release via GitHub API..."
           $headers = @{
             'Authorization' = "token $env:GITHUB_TOKEN"
             'Accept' = 'application/vnd.github.v3+json'
@@ -274,9 +187,9 @@ jobs:
           
           $apiUrl = "https://api.github.com/repos/${{ github.repository }}/releases"
           $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $body
-          Write-Host "Release $version created successfully via GitHub API"
+          Write-Host "Release $version created successfully"
         } catch {
-          Write-Host "Failed to create release via both CLI and API: $_"
+          Write-Host "Failed to create release: $_"
           exit 1
         }
 
