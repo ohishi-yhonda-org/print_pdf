@@ -90,6 +90,7 @@ func startHTTPServer() {
 	// HTTPルートの設定
 	http.HandleFunc("/generate-pdf", generatePDFHandler)
 	http.HandleFunc("/print-pdf", printPDFHandler)
+	http.HandleFunc("/print", envelopePrintHandler) // 新しい封筒印刷エンドポイント
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeEventLog("INFO", fmt.Sprintf("ルートアクセス from %s", r.RemoteAddr))
@@ -99,6 +100,7 @@ PDF Generator API Server %s
 Available endpoints:
 - POST /generate-pdf : Generate PDF from JSON data
 - POST /print-pdf    : Generate and print PDF
+- POST /print        : Print PDF file (envelope printing)
 - GET  /health       : Health check
 
 Example request (generate only):
@@ -126,6 +128,7 @@ Platform: %s %s
 	writeEventLog("INFO", fmt.Sprintf("HTTPサーバーを起動中... http://localhost%s", port))
 	writeEventLog("INFO", "PDF生成エンドポイント: POST /generate-pdf")
 	writeEventLog("INFO", "PDF印刷エンドポイント: POST /print-pdf")
+	writeEventLog("INFO", "封筒印刷エンドポイント: POST /print")
 	writeEventLog("INFO", "ヘルスチェック: GET /health")
 
 	httpServer = &http.Server{
@@ -454,6 +457,136 @@ func printPDFHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
 	}
+}
+
+// HTTPハンドラー: 封筒印刷専用エンドポイント（PHPからのマルチパート形式対応）
+func envelopePrintHandler(w http.ResponseWriter, r *http.Request) {
+	// CORSヘッダーを設定
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// OPTIONSリクエストの処理
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// POSTメソッドのみ許可
+	if r.Method != "POST" {
+		writeEventLog("WARN", fmt.Sprintf("不正なメソッドでのアクセス: %s from %s", r.Method, r.RemoteAddr))
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("封筒印刷リクエストを受信 from %s", r.RemoteAddr))
+
+	// マルチパートフォームデータを解析
+	err := r.ParseMultipartForm(32 << 20) // 32MB制限
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("マルチパートフォーム解析エラー: %v", err))
+		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+		return
+	}
+
+	// プリンター名を取得
+	printerName := r.FormValue("printer")
+	if printerName == "" {
+		writeEventLog("WARN", "プリンター名が指定されていません")
+		printerName = "default" // デフォルトプリンター
+	}
+
+	// PDFファイルを取得
+	file, header, err := r.FormFile("document")
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("PDFファイル取得エラー: %v", err))
+		http.Error(w, "Failed to get PDF file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	writeEventLog("INFO", fmt.Sprintf("受信ファイル: %s, サイズ: %d bytes, プリンター: %s", 
+		header.Filename, header.Size, printerName))
+
+	// 一時ファイルとして保存
+	tempDir := filepath.Join(os.TempDir(), "print_pdf_temp")
+	err = os.MkdirAll(tempDir, 0755)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("一時ディレクトリ作成エラー: %v", err))
+		http.Error(w, "Failed to create temp directory", http.StatusInternalServerError)
+		return
+	}
+
+	// ファイル名を生成（タイムスタンプ付き）
+	timestamp := time.Now().Format("20060102_150405")
+	tempFilename := fmt.Sprintf("envelope_%s_%s", timestamp, header.Filename)
+	tempFilePath := filepath.Join(tempDir, tempFilename)
+
+	// ファイルを保存
+	outFile, err := os.Create(tempFilePath)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("一時ファイル作成エラー: %v", err))
+		http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
+		return
+	}
+	defer outFile.Close()
+
+	// ファイル内容をコピー
+	_, err = io.Copy(outFile, file)
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("ファイルコピーエラー: %v", err))
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		return
+	}
+
+	writeEventLog("INFO", fmt.Sprintf("一時ファイル保存完了: %s", tempFilePath))
+
+	// PDF印刷を実行
+	writeEventLog("INFO", fmt.Sprintf("封筒印刷を開始: %s -> %s", tempFilePath, printerName))
+	err = PrintPDFWithSumatra(tempFilePath, printerName)
+	
+	// 一時ファイルを削除（印刷後）
+	defer func() {
+		if removeErr := os.Remove(tempFilePath); removeErr != nil {
+			writeEventLog("WARN", fmt.Sprintf("一時ファイル削除エラー: %v", removeErr))
+		} else {
+			writeEventLog("INFO", fmt.Sprintf("一時ファイル削除完了: %s", tempFilePath))
+		}
+	}()
+
+	if err != nil {
+		writeEventLog("ERROR", fmt.Sprintf("封筒印刷エラー: %v", err))
+		
+		// エラーレスポンス
+		response := map[string]interface{}{
+			"status":    "error",
+			"message":   fmt.Sprintf("印刷エラー: %v", err),
+			"filename":  header.Filename,
+			"printer":   printerName,
+			"printed":   false,
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	writeEventLog("INFO", "封筒印刷完了")
+	
+	// 成功レスポンス
+	response := map[string]interface{}{
+		"status":    "success",
+		"message":   "封筒印刷が正常に完了しました",
+		"filename":  header.Filename,
+		"printer":   printerName,
+		"printed":   true,
+		"fileSize":  header.Size,
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 // 自動アップデート機能

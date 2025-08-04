@@ -57,6 +57,48 @@ PDF生成エンドポイント
 }
 ```
 
+### POST /print
+封筒印刷専用エンドポイント（PHPからのマルチパート形式対応）
+
+**リクエスト例 (PHP CakeHTTP):**
+```php
+$client = new \Cake\Http\Client();
+$response = $client->post('http://172.18.21.233:8081/print', [
+    'document' => fopen('/var/www/html/files/futo.pdf', 'r'),
+    'printer' => 'LBP221-futo'
+]);
+```
+
+**リクエスト例 (curl):**
+```bash
+curl -X POST http://localhost:8081/print \
+  -F "document=@/path/to/envelope.pdf" \
+  -F "printer=LBP221-futo"
+```
+
+**レスポンス（成功時）:**
+```json
+{
+  "status": "success",
+  "message": "封筒印刷が正常に完了しました",
+  "filename": "futo.pdf",
+  "printer": "LBP221-futo",
+  "printed": true,
+  "fileSize": 12345
+}
+```
+
+**レスポンス（エラー時）:**
+```json
+{
+  "status": "error",
+  "message": "印刷エラー: プリンターが見つかりません",
+  "filename": "futo.pdf",
+  "printer": "LBP221-futo",
+  "printed": false
+}
+```
+
 ## インストール方法
 
 ### 方法1: GitHub Releasesからダウンロード
