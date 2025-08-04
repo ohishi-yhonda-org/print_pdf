@@ -188,8 +188,54 @@ jobs:
           $apiUrl = 'https://api.github.com/repos/${{ github.repository }}/releases'
           $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $body
           Write-Host ('Release ' + $version + ' created successfully')
+          
+          # Store release info for asset upload
+          $global:releaseId = $response.id
+          $global:uploadUrl = $response.upload_url
         } catch {
           Write-Host 'Failed to create release: ' + $_
+          exit 1
+        }
+    
+    - name: Build release executable
+      shell: powershell
+      run: |
+        Write-Host 'Building optimized executable...'
+        $env:GOOS = 'windows'
+        $env:GOARCH = 'amd64'
+        $env:CGO_ENABLED = '0'
+        go build -ldflags '-s -w -X main.Version=${{ steps.version.outputs.version }}' -trimpath -buildmode=exe -o print_pdf.exe .
+        Write-Host 'Build completed'
+        
+        # Display file info
+        $fileInfo = Get-Item print_pdf.exe
+        Write-Host ('File size: ' + $fileInfo.Length + ' bytes')
+        $hash = Get-FileHash print_pdf.exe -Algorithm SHA256
+        Write-Host ('SHA256: ' + $hash.Hash)
+    
+    - name: Create and upload ZIP archive
+      shell: powershell
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $version = '${{ steps.version.outputs.version }}'
+        $zipName = 'print_pdf_' + $version + '.zip'
+        
+        # Create ZIP archive
+        Compress-Archive -Path print_pdf.exe, service_manager.bat -DestinationPath $zipName
+        Write-Host ('ZIP archive created: ' + $zipName)
+        
+        # Display ZIP info
+        $zipInfo = Get-Item $zipName
+        Write-Host ('ZIP file size: ' + $zipInfo.Length + ' bytes')
+        
+        # Upload ZIP to release using GitHub CLI
+        try {
+          Write-Host 'Uploading ZIP archive to release...'
+          gh release upload $version $zipName
+          Write-Host 'ZIP archive uploaded successfully'
+        } catch {
+          Write-Host 'Failed to upload ZIP archive: ' + $_
           exit 1
         }
 
