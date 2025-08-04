@@ -23,6 +23,7 @@ import (
 )
 
 // Version information (set during build with -ldflags)
+// Development builds use "dev", production builds are set via CI
 var Version = "dev"
 
 // グローバル変数
