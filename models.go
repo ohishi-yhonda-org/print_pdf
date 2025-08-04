@@ -43,8 +43,8 @@ type Item struct {
 // PrintRequest represents the print request data structure
 type PrintRequest struct {
 	Items       []Item  `json:"items"`
-	Print       bool    `json:"print,omitempty"`        // 印刷するかどうか
-	PrinterName *string `json:"printerName,omitempty"`  // 指定プリンター名（省略時はデフォルト）
+	Print       bool    `json:"print,omitempty"`       // 印刷するかどうか
+	PrinterName *string `json:"printerName,omitempty"` // 指定プリンター名（省略時はデフォルト）
 }
 
 // Helper functions

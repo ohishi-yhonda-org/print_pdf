@@ -9,7 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"  
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -37,12 +37,12 @@ type service struct{}
 func (m *service) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPauseAndContinue
 	changes <- svc.Status{State: svc.StartPending}
-	
+
 	// HTTPサーバーを起動
 	go startHTTPServer()
-	
+
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-	
+
 	// サービス制御メッセージを待機
 	for {
 		select {
@@ -414,7 +414,7 @@ func printPDFHandler(w http.ResponseWriter, r *http.Request) {
 		if err := PrintPDFWithSumatra(pdfPath, printerName); err != nil {
 			writeEventLog("ERROR", fmt.Sprintf("印刷エラー: %v", err))
 			printMessage = fmt.Sprintf("PDF生成成功、印刷エラー: %v", err)
-			
+
 			// エラーレスポンス
 			response := map[string]interface{}{
 				"status":  "partial_success",
@@ -428,7 +428,7 @@ func printPDFHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			writeEventLog("INFO", "PDF印刷完了")
 			printMessage = "PDF generated and printed successfully"
-			
+
 			// 成功レスポンス
 			response := map[string]interface{}{
 				"status":  "success",
@@ -683,7 +683,7 @@ func main() {
 // Windowsサービスとして実行
 func runWindowsService() {
 	var err error
-	
+
 	// イベントログを開く（失敗しても続行）
 	elog, err = eventlog.Open("PDF Generator API Service")
 	if err != nil {

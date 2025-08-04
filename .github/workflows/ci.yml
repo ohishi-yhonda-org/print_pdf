@@ -129,10 +129,21 @@ jobs:
           $version = "${{ github.ref_name }}"
           Write-Host "Tag version: $version"
         } else {
-          # mainブランチの場合、日付ベースのバージョン
-          $date = Get-Date -Format "yyyyMMdd"
-          $time = Get-Date -Format "HHmm"
-          $version = "v1.0.0-dev.$date.$time"
+          # mainブランチの場合、最新タグから次のバージョンを生成
+          $latestTag = git tag --sort=-version:refname | Select-Object -First 1
+          if ($latestTag -match "v(\d+)\.(\d+)\.(\d+)") {
+            $major = [int]$matches[1]
+            $minor = [int]$matches[2]
+            $patch = [int]$matches[3] + 1
+            $date = Get-Date -Format "yyyyMMdd"
+            $time = Get-Date -Format "HHmm"
+            $version = "v$major.$minor.$patch-dev.$date.$time"
+          } else {
+            # タグが見つからない場合のフォールバック
+            $date = Get-Date -Format "yyyyMMdd"
+            $time = Get-Date -Format "HHmm"
+            $version = "v1.0.1-dev.$date.$time"
+          }
           Write-Host "Development version: $version"
         }
         echo "version=$version" >> $env:GITHUB_OUTPUT
