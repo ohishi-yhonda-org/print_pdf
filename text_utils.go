@@ -77,6 +77,8 @@ func wrapKukan(kukan string, maxLen int) TextWrapResult {
 	// 特殊な文字列を置換
 	kukan = strings.ReplaceAll(kukan, "_九州外空車適用", "　九州外空車適用")
 	kukan = strings.ReplaceAll(kukan, "適用*   追加", "適用*　追加")
+	// 半角スペースを全角スペースに変換
+	kukan = strings.ReplaceAll(kukan, " ", "　")
 
 	// 区切り文字で分割 (全角スペース、｜、半角スペース+|、など)
 	re := regexp.MustCompile(`[　｜]| \||\|`)
