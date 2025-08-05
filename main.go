@@ -776,12 +776,27 @@ func extractUpdate(zipPath string) error {
 			}
 
 			batchContent := fmt.Sprintf(`@echo off
-timeout /t 2 /nobreak >nul
-move "%s" "%s"
-move "%s" "%s"
+echo Waiting for service to stop...
+timeout /t 3 /nobreak >nul
+echo Moving new executable...
+move /Y "%s" "%s"
+if errorlevel 1 (
+    echo Failed to replace executable
+    exit /b 1
+)
+echo Moving backup...
+move /Y "%s" "%s"
+echo Starting service...
 %s
+if errorlevel 1 (
+    echo Failed to start service, retrying...
+    timeout /t 2 /nobreak >nul
+    %s
+)
+echo Update completed
+timeout /t 2 /nobreak >nul
 del "%%~f0"
-`, currentExe+".new", currentExe, backupPath, currentExe+".old", startCommand)
+`, currentExe+".new", currentExe, backupPath, currentExe+".old", startCommand, startCommand)
 
 			batchFile := "update_replace.bat"
 			if err := os.WriteFile(batchFile, []byte(batchContent), 0755); err != nil {

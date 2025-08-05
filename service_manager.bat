@@ -1,7 +1,7 @@
 @echo off
 REM PDF Generator Service Management Script
 
-set SERVICE_NAME=PDFGeneratorService
+set SERVICE_NAME=PDF Generator API Service
 set EXECUTABLE_PATH=%~dp0print_pdf.exe
 set SERVICE_DESCRIPTION=PDF Generator HTTP API Service
 
@@ -27,33 +27,33 @@ goto end
 
 :install
 echo Installing PDF Generator Service...
-sc create %SERVICE_NAME% binPath= "%EXECUTABLE_PATH%" start= auto DisplayName= "PDF Generator API Service" 
-sc description %SERVICE_NAME% "%SERVICE_DESCRIPTION%"
+sc create "%SERVICE_NAME%" binPath= "%EXECUTABLE_PATH%" start= auto DisplayName= "PDF Generator API Service" 
+sc description "%SERVICE_NAME%" "%SERVICE_DESCRIPTION%"
 echo Service installed successfully!
 goto end
 
 :start
 echo Starting PDF Generator Service...
-sc start %SERVICE_NAME%
+sc start "%SERVICE_NAME%"
 echo Service started!
 goto end
 
 :stop
 echo Stopping PDF Generator Service...
-sc stop %SERVICE_NAME%
+sc stop "%SERVICE_NAME%"
 echo Service stopped!
 goto end
 
 :remove
 echo Removing PDF Generator Service...
-sc stop %SERVICE_NAME%
-sc delete %SERVICE_NAME%
+sc stop "%SERVICE_NAME%"
+sc delete "%SERVICE_NAME%"
 echo Service removed!
 goto end
 
 :status
 echo Checking service status...
-sc query %SERVICE_NAME%
+sc query "%SERVICE_NAME%"
 goto end
 
 :logs
