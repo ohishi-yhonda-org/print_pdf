@@ -20,7 +20,8 @@
       "Bash(go build:*)",
       "Bash(rg:*)",
       "Bash(findstr:*)",
-      "Bash(./print_pdf_fixed.exe)"
+      "Bash(./print_pdf_fixed.exe)",
+      "Bash(del test_split.go)"
     ],
     "deny": []
   }
