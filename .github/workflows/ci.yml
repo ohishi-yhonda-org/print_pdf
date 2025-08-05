@@ -345,4 +345,47 @@ jobs:
         prerelease: false
         files: |
           print_pdf_${{ steps.set_version.outputs.version }}.zip
+    
+    - name: Restart service if running
+      if: success()
+      shell: powershell
+      continue-on-error: true
+      run: |
+        Write-Host 'Checking if PDF Generator API Service is running...'
+        $serviceName = 'PDF Generator API Service'
+        
+        try {
+          $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+          
+          if ($service) {
+            Write-Host ('Service found. Current status: ' + $service.Status)
+            
+            if ($service.Status -eq 'Running') {
+              Write-Host 'Service is running. Attempting to restart...'
+              
+              # Stop the service
+              Stop-Service -Name $serviceName -Force
+              Write-Host 'Service stopped'
+              
+              # Wait a moment for service to fully stop
+              Start-Sleep -Seconds 5
+              
+              # Start the service
+              Start-Service -Name $serviceName
+              Write-Host 'Service restarted successfully'
+              
+              # Verify service is running
+              Start-Sleep -Seconds 3
+              $service = Get-Service -Name $serviceName
+              Write-Host ('Service status after restart: ' + $service.Status)
+            } else {
+              Write-Host 'Service is not running. No restart needed.'
+            }
+          } else {
+            Write-Host 'Service is not installed on this machine.'
+          }
+        } catch {
+          Write-Host ('Error during service restart: ' + $_)
+          Write-Host 'This is not critical. The release was successful.'
+        }
 
